@@ -1,0 +1,45 @@
+---
+title: 'Final Project'
+author: Tom Cairns
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# Import the data
+bc <- read_csv('METABRIC_RNA_Mutation.csv')
+dim(bc)
+```
+
+```{r select-columns}
+# Feature selection
+bc <- bc %>%
+    select(cancer_type_detailed, !contains('mut'))
+bc <- bc[,-c(2:30)]
+```
+
+In this code block I selected the features of interest. These include the
+cancer_type_detailed, which is our target feature, and the gene expression data.
+
+```{r explore-data}
+# Create table of target feature
+table(bc$cancer_type_detailed)
+
+# Create correlation matrix - look for collinearity
+cor(bc[,-c(1)])
+
+# Function to check normality
+isNormal <- function(col) {
+    p <- shapiro.test(col)$p.value
+    
+    # Check if significant
+    alpha <- 0.05
+    return(p < 0.05)
+}
+
+# Find the normality of each column
+normal_cols <- lapply(bc[,-c(1)], isNormal)
+```
