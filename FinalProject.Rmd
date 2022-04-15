@@ -8,6 +8,8 @@ output: html_document
 library(tidyverse)
 ```
 
+## Explore Data
+
 ```{r}
 # Import the data
 bc <- read_csv('METABRIC_RNA_Mutation.csv')
@@ -28,9 +30,6 @@ cancer_type_detailed, which is our target feature, and the gene expression data.
 # Create table of target feature
 table(bc$cancer_type_detailed)
 
-# Create correlation matrix - look for collinearity
-cor(bc[,-c(1)])
-
 # Function to check normality
 isNormal <- function(col) {
     p <- shapiro.test(col)$p.value
@@ -42,4 +41,84 @@ isNormal <- function(col) {
 
 # Find the normality of each column
 normal_cols <- lapply(bc[,-c(1)], isNormal)
+
+# Identify the non normal columns
+which(normal_cols == F)
+
+# Remove non-normal columns
+bc <- bc[, -c(which(normal_cols == F))]
 ```
+
+Here we can see that there were 13 features with non normal distributions. Since
+I have many features and the algorithms I will be using assume normality in the
+data, I removed these columns.
+
+```{r check-colinearity}
+# Create correlation matrix
+cor.matrix <- cor(bc[,-c(1)])
+
+# Identify columns with potential colinearity
+threshold <- 0.9
+findCorrelation(cor.matrix, cutoff = threshold)
+```
+
+In this section I looked for instances of potential collinearity. I used a threshold
+of 0.9 and found no columns with a Pearson's correlation above this value. This
+means I can continue my analysis without concern.
+
+```{r remove-classes}
+# Remove highly imbalanced classes
+bc <- bc[bc$cancer_type_detailed %in% c('Breast Invasive Ductal Carcinoma',
+                                        'Breast Invasive Lobular Carcinoma',
+                                        'Breast Mixed Ductal and Lobular Carcinoma'),]
+
+table(bc$cancer_type_detailed)
+```
+
+In this section I removed three of the total classes from the column 
+`cancer_type_detailed`. I removed these classes since they all had fewer than
+25 total members. This would create a high bias in the algorithms which might
+ignore these classes. There is still some imbalance in the membership of the
+classes, but this is much closer to an acceptable split.
+
+
+## Split Data
+
+```{r split-data}
+# Set the Random Number Generator and seed
+RNGversion('3.5.2'); set.seed(5030)
+
+# Split the data to maintain proportions of classes
+sample <- createDataPartition(y = bc$cancer_type_detailed,
+                              p = 0.7,
+                              list = F)
+
+# Split into training and testing data
+bc_train <- bc[sample,]
+bc_test <- bc[-sample,]
+
+# Check that the data was split properly
+cat('\nProportions of training data classes:')
+proportions(table(bc_train$cancer_type_detailed))
+cat('\nProportion of testing data classes:')
+proportions(table(bc_test$cancer_type_detailed))
+```
+
+In this section I split the data into training and validation data sets. I used
+the function `createDataPartitions()` to do this after setting the random number
+generator and seed. I decided to use a 70/30 split for this project. 
+
+I then checked the proportions of each class to ensure that there were equivalent
+proportions in each data set. As we can see, the function worked correctly and
+we do have similar proportions for each of the classes in the training and 
+validation data. 
+
+
+## kNN
+
+
+
+
+
+
+
