@@ -6,6 +6,10 @@ output: html_document
 
 ```{r}
 library(tidyverse)
+library(caret)
+library(class)
+library(gmodels)
+library(vcd)
 ```
 
 ## Explore Data
@@ -116,9 +120,46 @@ validation data.
 
 ## kNN
 
+```{r}
+# Create kNN model
+bc.knn <- knn(bc_train[,-c(1)], bc_test[,-c(1)], cl = bc_train$cancer_type_detailed, 
+              k = 3)
 
+# Create Cross Table to verify accuracy
+knn.cross <- CrossTable(x = bc_test$cancer_type_detailed, y = bc.knn, 
+                        prop.chisq = F)
+```
 
+In this section I created a k nearest neighbors model using 3 values of k. 
+This model has an accuracy of 74.8%. 
 
+The precision of Breast Invasive Ductal Carcinoma is 83.6% (399 / 477) and the
+recall is 86.67% (399 / 450).
+
+The precision of Breast Invasic Lobular Carcinoma is 22.2% (8 / 31) and the 
+recall is 19% (8 / 42).
+
+The precision of Breast Mixed Ductal and Lobular Carcinoma is 17.4% (8 / 46)
+and the recall is 12.9% (8 / 62).
+
+From this model we can see that the most accurate classification is Breast
+Invasive Ductal Carcinoma. Neither of the other two categories are well
+classified. I think this is largely due to the imbalance in the categories
+of the data set.
+
+```{r}
+# Function to find the Accuracy
+findAccuracy <- function(cm) {
+    accuracy = (cm[1] + cm[5] + cm[9]) / sum(cm)
+}
+
+# Find the Kappa value
+accuracy.knn <- findAccuracy(knn.cross$t)
+paste('The accuracy of this kNN model is:', round(accuracy.knn, 3))
+kappa.knn <- Kappa(knn.cross$t)
+paste('The kappa statistic of the kNN model is:', 
+      round(kappa.knn$Unweighted[[1]], 3))
+```
 
 
 
