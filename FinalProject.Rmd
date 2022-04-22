@@ -22,7 +22,8 @@ library(nnet)
 
 ```{r}
 # Import the data
-bc <- read_csv('METABRIC_RNA_Mutation.csv')
+bc_filepath <- 'https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric/download'
+bc <- read_csv(bc_filepath)
 dim(bc)
 ```
 
