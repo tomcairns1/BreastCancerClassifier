@@ -4,12 +4,18 @@ author: Tom Cairns
 output: html_document
 ---
 
+# Business Understanding
+
+
+# Data Understanding
+
 ```{r}
 library(tidyverse)
 library(caret)
 library(class)
 library(gmodels)
 library(vcd)
+library(nnet)
 ```
 
 ## Explore Data
@@ -70,6 +76,9 @@ In this section I looked for instances of potential collinearity. I used a thres
 of 0.9 and found no columns with a Pearson's correlation above this value. This
 means I can continue my analysis without concern.
 
+
+# Data Preparation
+
 ```{r remove-classes}
 # Remove highly imbalanced classes
 bc <- bc[bc$cancer_type_detailed %in% c('Breast Invasive Ductal Carcinoma',
@@ -85,6 +94,17 @@ In this section I removed three of the total classes from the column
 ignore these classes. There is still some imbalance in the membership of the
 classes, but this is much closer to an acceptable split.
 
+```{r feature-elimination}
+bc$cancer_type_detailed <- as.numeric(factor(bc$cancer_type_detailed))
+
+bc.reg <- glm(cancer_type_detailed ~ ., data = bc, family = 'gaussian')
+
+# Perform the stepwise elimination
+step(bc.reg, direction = 'backward')
+```
+
+Since there are more than two classes in this dataset I will use multinomial
+logistic regression to select the features of most importance. 
 
 ## Split Data
 
@@ -117,6 +137,8 @@ proportions in each data set. As we can see, the function worked correctly and
 we do have similar proportions for each of the classes in the training and 
 validation data. 
 
+
+# Modeling 
 
 ## kNN
 
@@ -192,5 +214,34 @@ kappa.svm <- Kappa(svm.cross$t)
 paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
 ```
 
+Here we can see the accuracy of our model is 70%, which is less than the kNN
+model. However, the kappa statistic has increased to 0.15.
 
+
+## ANN
+
+```{r neural-net include=FALSE}
+# Train the model
+bc_ann <- train(cancer_type_detailed ~ ., data = bc_train, method = 'avNNet', 
+                na.action = na.omit)
+
+# Find predictions
+bc_ann.pred <- predict(bc_ann, bc_test)
+```
+
+```{r evaluate-nn}
+# Create CrossTable
+ann.cross <- CrossTable(x = bc_test$cancer_type_detailed, y = bc_ann.pred,
+                        prop.chisq = F)
+
+# Find accuracy
+accuracy.ann <- findAccuracy(ann.cross$t)
+paste('The accuracy of the model is:', round(accuracy.ann, 4))
+
+# Find kappa
+kappa.ann <- Kappa(ann.cross$t)
+paste('The Kappa Statistic is:', round(kappa.ann$Unweighted[[1]], 4))
+```
+
+Neural network has classified everything as the Breast Invasive Ductal Carcinoma.
 
