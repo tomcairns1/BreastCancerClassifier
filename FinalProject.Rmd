@@ -94,17 +94,20 @@ In this section I removed three of the total classes from the column
 ignore these classes. There is still some imbalance in the membership of the
 classes, but this is much closer to an acceptable split.
 
+## Feature Elimination
+
 ```{r feature-elimination}
 bc$cancer_type_detailed <- as.numeric(factor(bc$cancer_type_detailed))
 
 bc.reg <- glm(cancer_type_detailed ~ ., data = bc, family = 'gaussian')
 
 # Perform the stepwise elimination
-step(bc.reg, direction = 'backward')
+bc.step <- step(bc.reg, direction = 'backward')
 ```
 
-Since there are more than two classes in this dataset I will use multinomial
-logistic regression to select the features of most importance. 
+With 477 features, I am nervous about the curse of dimensionality so I want to
+reduce the number of features in my dataset. I accomplished this using backward
+stepwise feature elimination using a multiple logistic regression.
 
 ## Split Data
 
@@ -136,7 +139,6 @@ I then checked the proportions of each class to ensure that there were equivalen
 proportions in each data set. As we can see, the function worked correctly and
 we do have similar proportions for each of the classes in the training and 
 validation data. 
-
 
 # Modeling 
 
