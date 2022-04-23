@@ -16,14 +16,16 @@ library(class)
 library(gmodels)
 library(vcd)
 library(nnet)
+library(imbalance)
 ```
 
 ## Explore Data
 
 ```{r}
 # Import the data
-bc_filepath <- 'https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric/download'
-bc <- read_csv(bc_filepath)
+# bc_filepath <- 'https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric/download'
+# bc <- read.csv(bc_filepath)
+bc <- read.csv('METABRIC_RNA_Mutation.csv')
 dim(bc)
 ```
 
@@ -102,10 +104,10 @@ classes, but this is much closer to an acceptable split.
 RNGversion('3.5.2'); set.seed(5030)
 
 # Convert cancer type to numeric for regression
-bc$cancer_type_detailed <- as.numeric(factor(bc$cancer_type_detailed))
+bc$cancer_type_detailed_numeric <- as.numeric(factor(bc$cancer_type_detailed))
 
 # Create initial multiple logisitic regression model
-bc.reg <- glm(cancer_type_detailed ~ ., data = bc, family = 'gaussian')
+bc.reg <- glm(cancer_type_detailed_numeric ~ ., data = bc[,c(2:478)], family = 'gaussian')
 ```
 
 ```{r}
@@ -119,6 +121,18 @@ reduce the number of features in my dataset. I accomplished this using backward
 stepwise feature elimination using a multiple logistic regression. The model
 initially had an AIC of 3999.98, but after removing all but 90 features it
 reduced the AIC to 3443.711. 
+
+```{r}
+bc_train$cancer_type_detailed_numeric <- as.numeric(factor(bc_train$cancer_type_detailed))
+
+# Create initial multiple logistic regression model
+bc_train.reg <- glm(cancer_type_detailed_numeric ~ ., data = bc_train[,c(2:478)], family = 'gaussian')
+```
+
+```{r}
+# Perform the stepwise backward feature elimination using AIC
+bc_train.step <- step(bc_train.reg, direction = 'backward')
+```
 
 ```{r feature-selection}
 # Select the features from the step model
@@ -145,8 +159,8 @@ sample <- createDataPartition(y = bc$cancer_type_detailed,
                               list = F)
 
 # Split into training and testing data
-bc_train <- bc[sample,]
-bc_test <- bc[-sample,]
+bc_train <- bc.filter[sample,]
+bc_test <- bc.filter[-sample,]
 
 # Check that the data was split properly
 cat('\nProportions of training data classes:')
@@ -166,7 +180,16 @@ validation data.
 
 ## Oversampling
 
-In this data set I have a major class imbalance problem. 
+In this data set I have a major class imbalance problem. This is common in 
+gene expression analysis (Ang et al., 2016; Blagus & Lusa, 2012; Mahmudah et al.,
+2021; Tabares-Soto et al., 2020). Based on the results by Blagus & Lusa (2012),
+it seems that the best method of dealing with this is by using the Synthetic
+Minority Oversamplng Technique (SMOTE).
+
+```{r over-sampling}
+# Run an oversampling method
+mwmote(bc_train, numInstances = 4500, classAttr = bc_train$cancer_type_detailed)
+```
 
 # Modeling 
 
