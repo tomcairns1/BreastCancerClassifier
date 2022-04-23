@@ -97,25 +97,48 @@ classes, but this is much closer to an acceptable split.
 
 ## Feature Elimination
 
-```{r feature-elimination}
+```{r feature-elimination, include=FALSE}
+# Set the Random Number Generator and seed
+RNGversion('3.5.2'); set.seed(5030)
+
+# Convert cancer type to numeric for regression
 bc$cancer_type_detailed <- as.numeric(factor(bc$cancer_type_detailed))
 
+# Create initial multiple logisitic regression model
 bc.reg <- glm(cancer_type_detailed ~ ., data = bc, family = 'gaussian')
-
-# Perform the stepwise elimination
-bc.step <- step(bc.reg, direction = 'backward')
 ```
 
-With 477 features, I am nervous about the curse of dimensionality so I want to
+```{r}
+# Perform the stepwise elimination
+bc.step <- step(bc.reg, direction = 'backward')
+# beginning AIC was 3996.98, after feature selection it dropped to 3444
+```
+
+With 477 features, I was nervous about the curse of dimensionality so I want to
 reduce the number of features in my dataset. I accomplished this using backward
-stepwise feature elimination using a multiple logistic regression.
+stepwise feature elimination using a multiple logistic regression. The model
+initially had an AIC of 3999.98, but after removing all but 90 features it
+reduced the AIC to 3443.711. 
+
+```{r feature-selection}
+# Select the features from the step model
+cols.select <- colnames(bc.step$qr$qr)
+
+# Remove the intercept column
+cols.select <- cols.select[-1]
+
+# Filter dataset to only include these columns
+bc.filter <- bc[, cols.select]
+bc.filter$cancer_type_detailed <- bc$cancer_type_detailed
+```
+
+In this section I created a new dataframe containing only the features selected
+for in the multiple logistic regression model. This reduced the number of features
+from 477 to 91.
 
 ## Split Data
 
 ```{r split-data}
-# Set the Random Number Generator and seed
-RNGversion('3.5.2'); set.seed(5030)
-
 # Split the data to maintain proportions of classes
 sample <- createDataPartition(y = bc$cancer_type_detailed,
                               p = 0.7,
@@ -140,6 +163,10 @@ I then checked the proportions of each class to ensure that there were equivalen
 proportions in each data set. As we can see, the function worked correctly and
 we do have similar proportions for each of the classes in the training and 
 validation data. 
+
+## Oversampling
+
+In this data set I have a major class imbalance problem. 
 
 # Modeling 
 
