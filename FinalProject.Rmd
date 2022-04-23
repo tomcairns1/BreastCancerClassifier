@@ -134,16 +134,20 @@ bc_train.reg <- glm(cancer_type_detailed_numeric ~ ., data = bc_train[,c(2:478)]
 bc_train.step <- step(bc_train.reg, direction = 'backward')
 ```
 
+Here we applied the backward stepwise feature elimination using AIC. The
+regression model initially had an AIC of over 2800 and it dropped to 2359.72.
+The number of features decreased from 477 to 110.
+
 ```{r feature-selection}
 # Select the features from the step model
-cols.select <- colnames(bc.step$qr$qr)
+cols.select <- colnames(bc_train.step$qr$qr)
 
 # Remove the intercept column
 cols.select <- cols.select[-1]
 
 # Filter dataset to only include these columns
-bc.filter <- bc[, cols.select]
-bc.filter$cancer_type_detailed <- bc$cancer_type_detailed
+bc_train.filter <- bc_train[, cols.select]
+bc_train.filter$cancer_type_detailed <- bc_train$cancer_type_detailed
 ```
 
 In this section I created a new dataframe containing only the features selected
@@ -151,7 +155,7 @@ for in the multiple logistic regression model. This reduced the number of featur
 from 477 to 91.
 
 ## Split Data
-
+**THIS SHOULD BE MOVED UP**
 ```{r split-data}
 # Split the data to maintain proportions of classes
 sample <- createDataPartition(y = bc$cancer_type_detailed,
@@ -160,7 +164,9 @@ sample <- createDataPartition(y = bc$cancer_type_detailed,
 
 # Split into training and testing data
 bc_train <- bc.filter[sample,]
+bc_train$cancer_type_detailed <- bc[sample, c('cancer_type_detailed')]
 bc_test <- bc.filter[-sample,]
+bc_test$cancer_type_detailed <- bc[-sample, c('cancer_type_detailed')]
 
 # Check that the data was split properly
 cat('\nProportions of training data classes:')
@@ -178,6 +184,7 @@ proportions in each data set. As we can see, the function worked correctly and
 we do have similar proportions for each of the classes in the training and 
 validation data. 
 
+
 ## Oversampling
 
 In this data set I have a major class imbalance problem. This is common in 
@@ -188,8 +195,32 @@ Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
-mwmote(bc_train, numInstances = 4500, classAttr = bc_train$cancer_type_detailed)
+# mwmote(bc_train.filter, numInstances = 3150, classAttr = bc_train$cancer_type_detailed)
+
+# A simple oversampling
+bmdalc <- filter(bc_train, 
+                 cancer_type_detailed == 'Breast Mixed Ductal and Lobular Carcinoma')
+bilc <- filter(bc_train, cancer_type_detailed == 'Breast Invasive Lobular Carcinoma')
+
+# Add to the dataset
+bc_train.oversampled <- rbind(bc_train, bmdalc, bmdalc, bmdalc, bmdalc, 
+                              bmdalc, bmdalc, bilc, bilc, bilc, bilc, bilc, bilc, 
+                              bilc, bilc, bilc, bilc)
+
+# Check that it worked
+table(bc_train.oversampled$cancer_type_detailed)
 ```
+
+In this code block I created a simple oversampling method of the data to fix
+the class imbalance problem. There were 1050 classes of Breast Invasive Ductal
+Carcinoma, 100 instances of Breast Invasive Lobular Carcinoma, and 145 instances
+of Breast Mixed Ductal and Lobular Carcinoma. I used oversampling to increase
+the samples of the minority classes to be about the same as the majority class.
+I needed to make 6 copies of the Breast Mixed Ductal and Lobular Carcinoma and
+10 copies of the Breast Invasive Lobulr Carcinoma.
+
+I created the variable `bc_train.oversampled` which contains almost equal
+sizes of each class.
 
 # Modeling 
 
@@ -197,8 +228,9 @@ mwmote(bc_train, numInstances = 4500, classAttr = bc_train$cancer_type_detailed)
 
 ```{r}
 # Create kNN model
-bc.knn <- knn(bc_train[,-c(1)], bc_test[,-c(1)], cl = bc_train$cancer_type_detailed, 
-              k = 3)
+bc.knn <- knn(dplyr::select(bc_train.oversampled, -cancer_type_detailed), 
+              dplyr::select(bc_test, -cancer_type_detailed), 
+              cl = bc_train.oversampled$cancer_type_detailed, k = 3)
 
 # Create Cross Table to verify accuracy
 knn.cross <- CrossTable(x = bc_test$cancer_type_detailed, y = bc.knn, 
