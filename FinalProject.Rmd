@@ -176,7 +176,8 @@ Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
-# mwmote(bc_train.filter, numInstances = 3150, classAttr = bc_train$cancer_type_detailed)
+mwmote(bc_train.filter, numInstances = 2100, 
+       classAttr = bc_train.filter$cancer_type_detailed)
 
 # Simple oversampling
 bilc <- filter(bc_train.filter, cancer_type_detailed == 'Breast Invasive Lobular Carcinoma')
@@ -233,13 +234,13 @@ of the data set.
 
 ```{r}
 # Function to find the Accuracy
-# findAccuracy <- function(cm) {
-#     accuracy = (cm[1] + cm[5] + cm[9]) / sum(cm)
-# }
+findAccuracy <- function(cm) {
+    accuracy = (cm[1] + cm[4]) / sum(cm)
+}
 
-# Find the Kappa value
-# accuracy.knn <- findAccuracy(knn.cross$t)
-# paste('The accuracy of this kNN model is:', round(accuracy.knn, 3))
+# Find the Accuracy
+accuracy.knn <- findAccuracy(knn.cross$t)
+paste('The accuracy of this kNN model is:', round(accuracy.knn, 3))
 kappa.knn <- Kappa(knn.cross$t)
 paste('The kappa statistic of the kNN model is:', 
       round(kappa.knn$Unweighted[[1]], 3))
