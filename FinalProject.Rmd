@@ -136,7 +136,7 @@ validation data.
 bc_train$cancer_type_detailed_numeric <- as.numeric(factor(bc_train$cancer_type_detailed))
 
 # Create initial multiple logistic regression model
-bc_train.reg <- glm(cancer_type_detailed_numeric ~ ., data = bc_train[,c(2:478)], family = 'gaussian')
+bc_train.reg <- glm(cancer_type_detailed_numeric ~ ., data = bc_train[,-c(1)], family = 'gaussian')
 ```
 
 ```{r}
