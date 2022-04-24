@@ -100,8 +100,6 @@ In this section I removed three of the total classes from the column
 ignore these classes. There is still some imbalance in the membership of the
 classes, but this is much closer to an acceptable split.
 
-**I HAVE CHANGED THIS TO BINARY CLASSIFIER BC FUCK MIXED**
-
 ## Split Data
 **THIS SHOULD BE MOVED UP**
 ```{r split-data}
@@ -111,9 +109,9 @@ sample <- createDataPartition(y = bc$cancer_type_detailed,
                               list = F)
 
 # Split into training and testing data
-bc_train <- bc.filter[sample,]
+bc_train <- bc[sample,]
 bc_train$cancer_type_detailed <- bc[sample, c('cancer_type_detailed')]
-bc_test <- bc.filter[-sample,]
+bc_test <- bc[-sample,]
 bc_test$cancer_type_detailed <- bc[-sample, c('cancer_type_detailed')]
 
 # Check that the data was split properly
@@ -179,13 +177,12 @@ Minority Oversamplng Technique (SMOTE).
 # mwmote(bc_train.filter, numInstances = 3150, classAttr = bc_train$cancer_type_detailed)
 
 # A simple oversampling
-bmdalc <- filter(bc_train, 
-                 cancer_type_detailed == 'Breast Mixed Ductal and Lobular Carcinoma')
+# bmdalc <- filter(bc_train, 
+#                  cancer_type_detailed == 'Breast Mixed Ductal and Lobular Carcinoma')
 bilc <- filter(bc_train, cancer_type_detailed == 'Breast Invasive Lobular Carcinoma')
 
 # Add to the dataset
-bc_train.oversampled <- rbind(bc_train, bmdalc, bmdalc, bmdalc, bmdalc, 
-                              bmdalc, bmdalc, bilc, bilc, bilc, bilc, bilc, bilc, 
+bc_train.oversampled <- rbind(bc_train, bilc, bilc, bilc, bilc, bilc, bilc, 
                               bilc, bilc, bilc, bilc)
 
 # Check that it worked
@@ -211,7 +208,7 @@ sizes of each class.
 # Create kNN model
 bc.knn <- knn(dplyr::select(bc_train.oversampled, -cancer_type_detailed), 
               dplyr::select(bc_test, -cancer_type_detailed), 
-              cl = bc_train.oversampled$cancer_type_detailed, k = 3)
+              cl = bc_train.oversampled$cancer_type_detailed, k = 2)
 
 # Create Cross Table to verify accuracy
 knn.cross <- CrossTable(x = bc_test$cancer_type_detailed, y = bc.knn, 
