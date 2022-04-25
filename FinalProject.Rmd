@@ -58,9 +58,7 @@ was able to find the original source of the data on https://www.cbioportal.org/s
 I used the `cBioPortal()` api to pull clinical data, sample data, and the mrna
 expression data from the study.
 
-```{r}
-# Clean data
-#############
+```{r clean-data}
 gene_data <- gene_data$brca_metabric_mrna
 
 # Combine data sets and extract important information
@@ -100,6 +98,14 @@ continue with the dataset I have obtained from cbio. It is possible that the
 kaggle user pulled other molecular profile Ids, whereas I just pulled from
 'brca_metabric_mrna'.
 
+```{r}
+# Check missing values
+missing_vals <- lapply(bc, is.na)
+paste('The number of missing values is:', sum(unlist(missing_vals)))
+```
+
+In this code section I check the dataset for missing values. There are no
+missing values in the entire data set.
 
 ```{r check_normality}
 # Create table of target feature
@@ -123,24 +129,58 @@ which(normal_cols == F)
 
 In this code block I use a Shapiro-Wilk test of normality to find the columns
 that do not express normal distribution. From this I found that genes PIK3R1,
-NCOR2, SF3B1, AHNAK2, and RASGEF1B are not normally distributed. 
+NCOR2, SF3B1, AHNAK2, and RASGEF1B are not normally distributed. The number
+under each gene name represents the column index - 2 for the two character
+columns that were removed. 
 
 ```{r visualize-nonnormal-features}
 # Create plots for the not-normally distributed plots
 createHist <- function(col) {
   bc %>%
     ggplot(aes(x = col)) +
-    geom_histogram()
+    geom_histogram(binwidth = 0.1)
 }
 
-for (col in 1:bc[,which(normal_cols == F)]) {
-  plot <- createHist(col)
-  plot
-}
+lapply(bc[,which(normal_cols == F)], createHist)
 ```
 
-```{r normalize_features}
+In this code section I created some histograms to visualize the distribution of
+the non-normal data. It's apparent that in most cases the data has a bell shape,
+but is either slightly skewed or contains outliers. 
 
+```{r normalize-data}
+# Normalize the data using z-score
+bc.scaled <- as.data.frame(lapply(bc[,-c(1, 2)], scale))
+
+# Count the number of outliers
+paste('The number of outliers is:', sum(bc.scaled > 3))
+```
+
+In this code block I normalized the data by converting the values to z-scores.
+I then found the number of outliers, which I am defining as greater than 3
+standard deviations from the mean. 
+
+```{r outlier-control}
+# Function to replace outliers with NA
+removeOutliers <- function(col) {
+  return(ifelse(col > 3, NA, col))
+}
+
+# Remove the outliers
+bc.removed_outliers <- as.data.frame(lapply(bc.scaled, removeOutliers))
+
+# Function to impute missing values with mean
+imputeVals <- function(col) {
+  mean.col <- mean(col, na.rm = T)
+  return(ifelse(is.na(col), mean.col, col))
+}
+
+# Impute the missing values
+bc.imputed <- as.data.frame(lapply(bc.removed_outliers, imputeVals))
+
+# Check normality again
+normal_cols <- lapply(bc.imputed, isNormal)
+which(normal_cols == F)
 ```
 
 ```{r check-colinearity}
