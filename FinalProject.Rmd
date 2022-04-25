@@ -29,7 +29,7 @@ For this project I am using the METABRIC Breast Cancer Gene Expression Profiles
 data set from kaggle: https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
 This data was downloaded from the cBioPortal. 
 
-```{r import-libraries}
+```{r import-libraries, include=FALSE}
 library(cBioPortalData)
 library(tidyverse)
 library(caret)
@@ -49,36 +49,59 @@ clinical <- clinicalData(api = cbio, studyId = 'brca_metabric')
 all_samples <- allSamples(cbio, 'brca_metabric')
 gene_panel <- getGenePanel(cbio, 'METABRIC_173')
 gene_data <- molecularData(cbio, molecularProfileIds = 'brca_metabric_mrna', entrezGeneIds = gene_panel$entrezGeneId, sampleIds = all_samples$sampleId)
-
-# bc <- read.csv('METABRIC_RNA_Mutation.csv')
 ```
 
-In this section I used the cBioPortal api to pull clinical data, sample data,
-and the gene data from the study.
+In my initial plan for this project I downloaded the data from kaggle:https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
+I could not figure out a way to download the data directly from kaggle, but I
+was able to find the original source of the data on https://www.cbioportal.org/study/summary?id=brca_metabric.
+
+I used the `cBioPortal()` api to pull clinical data, sample data, and the mrna
+expression data from the study.
 
 ```{r}
 # Clean data
 #############
-
 gene_data <- gene_data$brca_metabric_mrna
-# Join the gene name
-gene_data %>%
-  left_join(gene_panel)
-left_join(gene_data, gene_panel, by = entrezGeneId)
 
+# Combine data sets and extract important information
+bc <- gene_data %>%
+  left_join(gene_panel) %>%
+  left_join(clinical) %>%
+  select(sampleId, value, hugoGeneSymbol, CANCER_TYPE_DETAILED) %>%
+  pivot_wider(names_from = hugoGeneSymbol) %>%
+  filter(CANCER_TYPE_DETAILED %in% c('Breast Invasive Ductal Carcinoma',
+                                     'Breast Invasive Lobular Carcinoma'))
 ```
 
-```{r select-columns}
-# Feature selection
-bc <- bc %>%
-    select(cancer_type_detailed, !contains('mut'))
-bc <- bc[,-c(2:30)]
-```
+In this section I join the gene_panel and clinical dataframes to the gene_data
+data frame. I then select the columns of interest that I will use for this
+project (sampleId, patientId, value, hugoGeneSymbol, and cancer_type_detailed).
+Since this dataset was in a long format, where each row contained a unique 
+sample and gene, I had to pivot it wider so that each row was a unique
+sample. Finally I filtered the cancer_type_detailed to contain the two types
+of cancer that I am interested in distinguishing between: Breast Invasive
+Ductal Carcinoma and Breast Invasive Lobular Carcinoma.
 
-In this code block I selected the features of interest. These include the
-cancer_type_detailed, which is our target feature, and the gene expression data.
+There are some slight deviations here from my original plan. First, I am
+choosing to run a binary classifier for this instead of the three classes that
+I had originally planned for. The original data contains 8 classes, but 4 of these
+classes have fewer than 30 observations, 1 class contains "mixed" tumors, and
+one is "invasive breast carcinoma" which is less descriptive. In my original
+plan I had hoped to use the "Breast Mixed Ductal and Lobular Carcinoma" class,
+but my models were having a difficult time distinguishing this class from the
+other two since it is a combination of both. I decided for simplicity and accuracy
+to remove this class from my project.
 
-```{r explore-data}
+The other main deviation is in the dimensions of the project. The dataset from
+kaggle contained ~476 gene features of data, but pulling this data directly from
+the api, I found that it only contains 168 gene features. I am not sure where
+the kaggle user obtained data for the other 300 genes, but I am choosing to 
+continue with the dataset I have obtained from cbio. It is possible that the
+kaggle user pulled other molecular profile Ids, whereas I just pulled from
+'brca_metabric_mrna'.
+
+
+```{r check_normality}
 # Create table of target feature
 table(bc$cancer_type_detailed)
 
@@ -92,18 +115,33 @@ isNormal <- function(col) {
 }
 
 # Find the normality of each column
-normal_cols <- lapply(bc[,-c(1)], isNormal)
+normal_cols <- lapply(bc[,-c(1, 2)], isNormal)
 
 # Identify the non normal columns
 which(normal_cols == F)
-
-# Remove non-normal columns
-bc <- bc[, -c(which(normal_cols == F))]
 ```
 
-Here we can see that there were 13 features with non normal distributions. Since
-I have many features and the algorithms I will be using assume normality in the
-data, I removed these columns.
+In this code block I use a Shapiro-Wilk test of normality to find the columns
+that do not express normal distribution. From this I found that genes PIK3R1,
+NCOR2, SF3B1, AHNAK2, and RASGEF1B are not normally distributed. 
+
+```{r visualize-nonnormal-features}
+# Create plots for the not-normally distributed plots
+createHist <- function(col) {
+  bc %>%
+    ggplot(aes(x = col)) +
+    geom_histogram()
+}
+
+for (col in 1:bc[,which(normal_cols == F)]) {
+  plot <- createHist(col)
+  plot
+}
+```
+
+```{r normalize_features}
+
+```
 
 ```{r check-colinearity}
 # Create correlation matrix
