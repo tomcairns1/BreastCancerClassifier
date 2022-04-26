@@ -251,41 +251,7 @@ overall cases (Barroso-Sousa & Metzger-Filho, 2016).
 
 ## Feature Elimination
 
-```{r feature-selection-main-model}
-# Convert cancer type to numeric
-bc_train$cancer_type_numeric <- as.numeric(factor(bc_train$cancer_type))
 
-# Create initial multiple logistic regression model
-bc_train.reg <- glm(cancer_type_numeric ~ ., data = bc_train[,-c(169)], 
-                    family = 'gaussian')
-```
-
-```{r stepwise-elimination, include=F}
-# Perform the stepwise backward feature elimination using AIC
-bc_train.step <- step(bc_train.reg, direction = 'backward')
-```
-
-Here we applied the backward stepwise feature elimination using AIC. The
-regression model initially had an AIC of over 2800 and it dropped to 2359.72.
-The number of features decreased from 477 to 110.
-
-```{r feature-selection}
-# Select the features from the step model
-cols.select <- colnames(bc_train.step$qr$qr)
-
-# Remove the intercept column
-cols.select <- cols.select[-1]
-
-# Filter dataset to only include these columns
-bc_train.filter <- bc_train[, cols.select]
-bc_test.filter <- bc_test[, cols.select]
-bc_train.filter$cancer_type_detailed <- bc_train$cancer_type_detailed
-bc_test.filter$cancer_type_detailed <- bc_test$cancer_type_detailed
-```
-
-In this section I created a new dataframe containing only the features selected
-for in the multiple logistic regression model. This reduced the number of features
-from 477 to 91.
 
 ## Oversampling
 
@@ -297,18 +263,19 @@ Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
-# minority_cases <- mwmote(bc_train.filter, numInstances = 900,
-#                          classAttr = 'cancer_type_detailed')
+minority_cases <- mwmote(bc_train.filter, numInstances = 814,
+                         classAttr = 'cancer_type')
 
 # Simple oversampling method
-bilc <- filter(bc_train.filter, cancer_type_detailed == 'Breast Invasive Lobular Carcinoma')
+# bilc <- filter(bc_train.filter, cancer_type_detailed == 'Breast Invasive Lobular Carcinoma')
 
 # Add to the dataset
-bc_train.oversampled <- rbind(bc_train.filter, bilc, bilc, bilc, bilc, bilc,
-                              bilc, bilc, bilc, bilc)
+# bc_train.oversampled <- rbind(bc_train.filter, bilc, bilc, bilc, bilc, bilc,
+                              # bilc, bilc, bilc, bilc)
+bc_train.oversampled <- rbind(bc_train.filter, minority_cases)
 
 # Check that it worked
-table(bc_train.oversampled$cancer_type_detailed)
+table(bc_train.oversampled$cancer_type)
 ```
 
 In this code block I created a simple oversampling method of the data to fix
@@ -327,12 +294,12 @@ sizes of each class.
 
 ```{r}
 # Create kNN model
-bc.knn <- knn(dplyr::select(bc_train.oversampled, -cancer_type_detailed), 
-              dplyr::select(bc_test.filter, -cancer_type_detailed), 
-              cl = bc_train.oversampled$cancer_type_detailed, k = 2)
+bc.knn <- knn(dplyr::select(bc_train.oversampled, -cancer_type), 
+              dplyr::select(bc_test.filter, -cancer_type), 
+              cl = bc_train.oversampled$cancer_type, k = 2)
 
 # Create Cross Table to verify accuracy
-knn.cross <- CrossTable(x = bc_test.filter$cancer_type_detailed, y = bc.knn, 
+knn.cross <- CrossTable(x = bc_test.filter$cancer_type, y = bc.knn, 
                         prop.chisq = F)
 ```
 
@@ -373,7 +340,7 @@ that the imbalance in the data set is introducing bias in the model.
 
 ```{r}
 # Create the model
-bc_svm <- train(cancer_type_detailed ~ ., data = bc_train.oversampled, 
+bc_svm <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'svmLinear3')
 
 # Predict test data
@@ -384,12 +351,12 @@ I created a simple Support Vector Machine model using the svmLinear3 parameter.
 
 ```{r}
 # Create CrossTable
-svm.cross <- CrossTable(x = bc_test$cancer_type_detailed, y = bc_svm.pred,
+svm.cross <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred,
                         prop.chisq = F)
 
 # Find accuracy
-# accuracy.svm <- findAccuracy(svm.cross$t)
-# paste('The accuracy of the model is:', round(accuracy.svm, 4))
+accuracy.svm <- findAccuracy(svm.cross$t)
+paste('The accuracy of the model is:', round(accuracy.svm, 4))
 
 # Find kappa
 kappa.svm <- Kappa(svm.cross$t)
@@ -402,10 +369,9 @@ model. However, the kappa statistic has increased to 0.15.
 
 ## ANN
 
-```{r neural-net include=FALSE}
+```{r neural-net, include=FALSE}
 # Train the model
-bc_ann <- train(cancer_type_detailed ~ ., data = bc_train.oversampled, method = 'avNNet', 
-                na.action = na.omit)
+bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'avNNet')
 
 # Find predictions
 bc_ann.pred <- predict(bc_ann, bc_test)
@@ -413,12 +379,8 @@ bc_ann.pred <- predict(bc_ann, bc_test)
 
 ```{r evaluate-nn}
 # Create CrossTable
-ann.cross <- CrossTable(x = bc_test$cancer_type_detailed, y = bc_ann.pred,
+ann.cross <- CrossTable(x = bc_test$cancer_type, y = bc_ann.pred,
                         prop.chisq = F)
-
-# Find accuracy
-# accuracy.ann <- findAccuracy(ann.cross$t)
-# paste('The accuracy of the model is:', round(accuracy.ann, 4))
 
 # Find kappa
 kappa.ann <- Kappa(ann.cross$t)
