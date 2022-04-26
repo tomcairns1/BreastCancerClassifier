@@ -251,7 +251,18 @@ overall cases (Barroso-Sousa & Metzger-Filho, 2016).
 
 ## Feature Elimination
 
+Feature selection in gene studies, also known as gene selection, is a common
+practice (Ang et al., 2016). However, most of the studies that utilize gene
+selection have thousands of genes and fewer samples. This leads to the curse
+of dimensionality. 
 
+In this project I only have 168 genes and the training data set has close to
+1000 observations before oversampling. While there are still many features,
+when I ran backward stepwise logistic regression based on AIC (not shown) I was
+left with 40 genes of interest. This is a major loss of information and my SVM
+and neural network models showed lower accuracy using these selected features.
+Therefore, I have decided to remove feature selection from this project and stick
+with all 168 genes.
 
 ## Oversampling
 
@@ -266,27 +277,24 @@ Minority Oversamplng Technique (SMOTE).
 minority_cases <- mwmote(bc_train.filter, numInstances = 814,
                          classAttr = 'cancer_type')
 
-# Simple oversampling method
-# bilc <- filter(bc_train.filter, cancer_type_detailed == 'Breast Invasive Lobular Carcinoma')
-
 # Add to the dataset
-# bc_train.oversampled <- rbind(bc_train.filter, bilc, bilc, bilc, bilc, bilc,
-                              # bilc, bilc, bilc, bilc)
 bc_train.oversampled <- rbind(bc_train.filter, minority_cases)
 
 # Check that it worked
 table(bc_train.oversampled$cancer_type)
 ```
 
-In this code block I created a simple oversampling method of the data to fix
-the class imbalance problem. There were 1050 classes of Breast Invasive Ductal
-Carcinoma and 100 instances of Breast Invasive Lobular Carcinoma. I used 
-oversampling to increase
-the samples of the minority class to be about the same as the majority class.
-I needed to make 10 copies of the Breast Invasive Lobulr Carcinoma.
+In this code block I used the `mwmote()` function, which stands for majority
+weighted minority oversampling technique. This is a variation of the SMOTE
+technique which aims to limit noisy data. Since I have decided to not use feature
+selection, reducing noisy data is important.
 
-I created the variable `bc_train.oversampled` which contains almost equal
-sizes of each class.
+I added 814 new instances of the minority class, breast invasive lobular
+carcinoma, so that it would have the same number of samples as the majority
+class, breast invasive ductal carcinoma. 
+
+I created the variable `bc_train.oversampled` which contains equal sizes of each
+class.
 
 # Modeling 
 
@@ -394,8 +402,12 @@ Neural network has classified everything as the Breast Invasive Ductal Carcinoma
 
 # References
 
+Ang, J. C., Mirzal, A., Haron, H., & Hamed, H. N. (2016). Supervised, unsupervised, and semi-supervised feature selection: A review on gene selection. IEEE/ACM Transactions on Computational Biology and Bioinformatics, 13(5), 971–989. https://doi.org/10.1109/tcbb.2015.2478454 
+
 Barroso-Sousa, R., & Metzger-Filho, O. (2016). Differences between invasive lobular and invasive ductal carcinoma of the breast: Results and therapeutic implications. Therapeutic Advances in Medical Oncology, 8(4), 261–266. https://doi.org/10.1177/1758834016644156 
 
 Basic Information About Breast Cancer. (2021, September 20). Centers for Disease Control and Prevention. Retrieved April 24, 2022 from, https://www.cdc.gov/cancer/breast/basic_info/index.htm
+
+Mahmudah, K., Purnama, B., Indriani, F., & Satou, K. (2021). Machine learning algorithms for predicting chronic obstructive pulmonary disease from gene expression data with class imbalance. Proceedings of the 14th International Joint Conference on Biomedical Engineering Systems and Technologies. https://doi.org/10.5220/0010316501480153 
 
 Tabares-Soto, R., Orozco-Arias, S., Romero-Cano, V., Segovia Bucheli, V., Rodríguez-Sotelo, J. L., & Jiménez-Varón, C. F. (2020). A comparative study of machine learning and deep learning algorithms to classify cancer types based on microarray gene expression data. PeerJ Computer Science, 6. https://doi.org/10.7717/peerj-cs.270 
