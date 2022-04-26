@@ -188,7 +188,7 @@ much  more normally distributed.
 
 ```{r check-colinearity}
 # Create correlation matrix
-cor.matrix <- cor(bc.removed_outliers[,-c(1, 2)])
+cor.matrix <- cor(dplyr::select(bc.removed_outliers, -cancer_type))
 
 # Identify columns with potential colinearity
 threshold <- 0.9
@@ -274,11 +274,11 @@ Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
-minority_cases <- mwmote(bc_train.filter, numInstances = 814,
+minority_cases <- mwmote(bc_train, numInstances = 814,
                          classAttr = 'cancer_type')
 
 # Add to the dataset
-bc_train.oversampled <- rbind(bc_train.filter, minority_cases)
+bc_train.oversampled <- rbind(bc_train, minority_cases)
 
 # Check that it worked
 table(bc_train.oversampled$cancer_type)
@@ -302,12 +302,12 @@ class.
 
 ```{r}
 # Create kNN model
-bc.knn <- knn(dplyr::select(bc_train.oversampled, -cancer_type), 
-              dplyr::select(bc_test.filter, -cancer_type), 
+bc.knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type), 
+              test = dplyr::select(bc_test, -cancer_type), 
               cl = bc_train.oversampled$cancer_type, k = 2)
 
 # Create Cross Table to verify accuracy
-knn.cross <- CrossTable(x = bc_test.filter$cancer_type, y = bc.knn, 
+knn.cross <- CrossTable(x = bc_test$cancer_type, y = bc.knn, 
                         prop.chisq = F)
 ```
 
@@ -371,8 +371,8 @@ kappa.svm <- Kappa(svm.cross$t)
 paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
 ```
 
-Here we can see the accuracy of our model is 70%, which is less than the kNN
-model. However, the kappa statistic has increased to 0.15.
+Here we can see the accuracy of our model is 88.7% with a kappa statistic of
+0.4736. This is a much better fit of the data than the kNN model.
 
 
 ## ANN
@@ -397,7 +397,10 @@ paste('The Kappa Statistic is:', round(kappa.ann$Unweighted[[1]], 4))
 
 Neural network has classified everything as the Breast Invasive Ductal Carcinoma.
 
+## Ensemble
 
+
+# Conclusions
 
 
 # References
