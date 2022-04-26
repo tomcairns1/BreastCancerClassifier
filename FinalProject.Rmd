@@ -247,18 +247,20 @@ proportions in each data set. As we can see, the function worked correctly and
 we do have similar proportions for each of the classes in the training and 
 validation data. There is an obvious class imbalance in the data, but this aligns
 with real world data where invasive lobular carcinoma makes up about 10% of
-overall cases (Barroso-Sousa & Metzger-Filho, 2016)
+overall cases (Barroso-Sousa & Metzger-Filho, 2016).
 
 ## Feature Elimination
 
-```{r}
-bc_train$cancer_type_detailed_numeric <- as.numeric(factor(bc_train$cancer_type_detailed))
+```{r feature-selection-main-model}
+# Convert cancer type to numeric
+bc_train$cancer_type_numeric <- as.numeric(factor(bc_train$cancer_type))
 
 # Create initial multiple logistic regression model
-bc_train.reg <- glm(cancer_type_detailed_numeric ~ ., data = bc_train[,-c(1)], family = 'gaussian')
+bc_train.reg <- glm(cancer_type_numeric ~ ., data = bc_train[,-c(169)], 
+                    family = 'gaussian')
 ```
 
-```{r}
+```{r stepwise-elimination, include=F}
 # Perform the stepwise backward feature elimination using AIC
 bc_train.step <- step(bc_train.reg, direction = 'backward')
 ```
