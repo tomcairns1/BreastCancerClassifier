@@ -152,40 +152,43 @@ but is either slightly skewed or contains outliers.
 # Normalize the data using z-score
 bc.scaled <- as.data.frame(lapply(bc[,-c(1, 2)], scale))
 
-# Count the number of outliers
-paste('The number of outliers is:', sum(bc.scaled > 3))
+# Function to count number of outliers per column
+findOutliers <- function(col) {
+  return(sum(col > 3))
+}
+
+# Find these outliers
+as.data.frame(lapply(bc.scaled, findOutliers))
 ```
 
 In this code block I normalized the data by converting the values to z-scores.
-I then found the number of outliers, which I am defining as greater than 3
-standard deviations from the mean. 
+I then found the number of outliers for each column, which I am defining as 
+greater than 3 standard deviations from the mean. Most columns have a couple
+outliers, but CDKN2A, GLDC, TTYH1, COL22A1, and FRMD3 have over 40 outliers
+each.
 
 ```{r outlier-control}
 # Function to replace outliers with NA
 removeOutliers <- function(col) {
-  return(ifelse(col > 3, NA, col))
+  return(ifelse(col > 3, median(col), col))
 }
 
 # Remove the outliers
 bc.removed_outliers <- as.data.frame(lapply(bc.scaled, removeOutliers))
+bc.removed_outliers$cancer_type <- bc$CANCER_TYPE_DETAILED
 
-# Function to impute missing values with mean
-imputeVals <- function(col) {
-  mean.col <- mean(col, na.rm = T)
-  return(ifelse(is.na(col), mean.col, col))
-}
-
-# Impute the missing values
-bc.imputed <- as.data.frame(lapply(bc.removed_outliers, imputeVals))
-
-# Check normality again
-normal_cols <- lapply(bc.imputed, isNormal)
-which(normal_cols == F)
+# Check the histograms again
+lapply(bc.removed_outliers[,which(normal_cols == F)], createHist)
 ```
+
+In this code block I replaced outliers in each column with the median value
+of that column. I chose median because it is less influenced by outliers than
+mean. I then recreated the histograms from above and we can see the data appears
+much  more normally distributed. 
 
 ```{r check-colinearity}
 # Create correlation matrix
-cor.matrix <- cor(bc[,-c(1)])
+cor.matrix <- cor(bc.removed_outliers[,-c(1, 2)])
 
 # Identify columns with potential colinearity
 threshold <- 0.9
@@ -193,55 +196,58 @@ findCorrelation(cor.matrix, cutoff = threshold)
 ```
 
 In this section I looked for instances of potential collinearity. I used a threshold
-of 0.9 and found no columns with a Pearson's correlation above this value. This
-means I can continue my analysis without concern.
+of 0.9 and found no columns with a Pearson's correlation above this value. There
+were no columns that showed colinearity. This means I can continue my analysis 
+without concern.
 
 
 # Data Preparation
 
-```{r remove-classes}
-# Remove highly imbalanced classes
-bc <- bc[bc$cancer_type_detailed %in% c('Breast Invasive Ductal Carcinoma',
-                                        'Breast Invasive Lobular Carcinoma'),]
-
-table(bc$cancer_type_detailed)
-```
-
-In this section I removed three of the total classes from the column 
-`cancer_type_detailed`. I removed these classes since they all had fewer than
-25 total members. This would create a high bias in the algorithms which might
-ignore these classes. There is still some imbalance in the membership of the
-classes, but this is much closer to an acceptable split.
-
 ## Split Data
-**THIS SHOULD BE MOVED UP**
+
 ```{r split-data}
 # Split the data to maintain proportions of classes
-sample <- createDataPartition(y = bc$cancer_type_detailed,
-                              p = 0.7,
+sample <- createDataPartition(y = bc.removed_outliers$cancer_type,
+                              p = 0.6,
                               list = F)
 
 # Split into training and testing data
-bc_train <- bc[sample,]
-bc_train$cancer_type_detailed <- bc[sample, c('cancer_type_detailed')]
-bc_test <- bc[-sample,]
-bc_test$cancer_type_detailed <- bc[-sample, c('cancer_type_detailed')]
+bc_train <- bc.removed_outliers[sample,]
+bc_train$cancer_type <- bc.removed_outliers[sample, c('cancer_type')]
+remaining <- bc.removed_outliers[-sample,]
+remaining$cancer_type <- bc.removed_outliers[-sample, c('cancer_type')]
+
+sample2 <- createDataPartition(y = remaining$cancer_type,
+                                  p = 0.5, list = F)
+
+# Split test and validation data
+bc_test <- remaining[sample2,]
+bc_valid <- remaining[-sample2,]
+bc_test$cancer_type <- remaining[sample2, c('cancer_type')]
+bc_valid$cancer_type <- remaining[-sample2, c('cancer_type')]
+
 
 # Check that the data was split properly
 cat('\nProportions of training data classes:')
-proportions(table(bc_train$cancer_type_detailed))
+proportions(table(bc_train$cancer_type))
 cat('\nProportion of testing data classes:')
-proportions(table(bc_test$cancer_type_detailed))
+proportions(table(bc_test$cancer_type))
+cat('\nProportions of validation data classes:')
+proportions(table(bc_valid$cancer_type))
 ```
 
 In this section I split the data into training and validation data sets. I used
 the function `createDataPartitions()` to do this after setting the random number
-generator and seed. I decided to use a 70/30 split for this project. 
+generator and seed. I decided to use a 60/20/20 split for this project where
+60% of the data is used for training, 20% is used for testing, and the final
+20% is used for validation at the very end.
 
 I then checked the proportions of each class to ensure that there were equivalent
 proportions in each data set. As we can see, the function worked correctly and
 we do have similar proportions for each of the classes in the training and 
-validation data. 
+validation data. There is an obvious class imbalance in the data, but this aligns
+with real world data where invasive lobular carcinoma makes up about 10% of
+overall cases (Barroso-Sousa & Metzger-Filho, 2016)
 
 ## Feature Elimination
 
@@ -419,3 +425,13 @@ paste('The Kappa Statistic is:', round(kappa.ann$Unweighted[[1]], 4))
 
 Neural network has classified everything as the Breast Invasive Ductal Carcinoma.
 
+
+
+
+# References
+
+Barroso-Sousa, R., & Metzger-Filho, O. (2016). Differences between invasive lobular and invasive ductal carcinoma of the breast: Results and therapeutic implications. Therapeutic Advances in Medical Oncology, 8(4), 261–266. https://doi.org/10.1177/1758834016644156 
+
+Basic Information About Breast Cancer. (2021, September 20). Centers for Disease Control and Prevention. Retrieved April 24, 2022 from, https://www.cdc.gov/cancer/breast/basic_info/index.htm
+
+Tabares-Soto, R., Orozco-Arias, S., Romero-Cano, V., Segovia Bucheli, V., Rodríguez-Sotelo, J. L., & Jiménez-Varón, C. F. (2020). A comparative study of machine learning and deep learning algorithms to classify cancer types based on microarray gene expression data. PeerJ Computer Science, 6. https://doi.org/10.7717/peerj-cs.270 
