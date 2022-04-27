@@ -25,9 +25,28 @@ countries that do not have the same resources as the US.
 
 # Data Understanding
 
-For this project I am using the METABRIC Breast Cancer Gene Expression Profiles
-data set from kaggle: https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
-This data was downloaded from the cBioPortal. 
+For this project I am using data acquired by Pereira et al. (2016) in their
+attempt to classify cancer types from gene mutations. They sequenced 173 genes
+from breast cancer tumor samples of people who had clinical data. They used
+unsupervised methods on somatic copy number aberrations with the goal of
+idenitfying cancer types. 
+
+One of the important points they make in the paper is that some of the genes
+that show high expression might not be from working incorrectly, but rather 
+they could be tumor-suppressing genes. This certainly impacts my analysis since
+I am classifying on gene expression and there might be some bias introduced by
+keeping these tumor-suppressing genes. They could be expressing in one person,
+trying to kill the tumor, while suppressed in someone else. The techniques I am
+using would not be able to differentiate between "good" expression and "bad"
+expression.
+
+My project idea was originally created when I found the METABRIC Breast Cancer
+Gene Expression Profiles dataset on kaggle at https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
+
+Unfortunately I could not figure out a way to download the data directly from a
+URL on kaggle, so I tracked the source of the data to cBioPortal, a repository
+of data from genomic cancer studies, and was able to use their API to download
+the data directly into this project.
 
 ```{r import-libraries, include=FALSE}
 library(cBioPortalData)
@@ -300,6 +319,11 @@ class.
 
 ## kNN
 
+I decided to use a kNN algorithm for this project since it had been used
+previously in the literature (Tabares-Soto et al., 2020). kNN works well for
+numeric, normalized data, with a target classification. Therefore it is perfect
+for this project. 
+
 ```{r}
 # Create kNN model
 bc.knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type), 
@@ -346,6 +370,12 @@ that the imbalance in the data set is introducing bias in the model.
 
 ## SVM
 
+I decided to use a Support Vector Machine supervised learning algorithm for
+this project since it was shown by the literature to have strong performance for
+classifying cancer type using gene expression (Yuan et al., 2020). SVM is an
+algorithm to be used for classification with numeric, normalized data. It works
+similarly to kNN except it tries to maximize the distance between two groups.
+
 ```{r}
 # Create the model
 bc_svm <- train(cancer_type ~ ., data = bc_train.oversampled, 
@@ -377,6 +407,11 @@ Here we can see the accuracy of our model is 88.7% with a kappa statistic of
 
 ## ANN
 
+I decided to use a simple neural network algorithm for this project since it is
+a versatile algorithm. It can be used for classification and numeric, normalized
+features. Tabares-Soto et al. (2020) showed the benefit of this algorithm in
+predicting cancer type from gene expression data. 
+
 ```{r neural-net, include=FALSE}
 # Train the model
 bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'avNNet')
@@ -399,6 +434,45 @@ Neural network has classified everything as the Breast Invasive Ductal Carcinoma
 
 ## Ensemble
 
+```{r}
+# Create a basic ensemble method
+runEnsemble <- function(df) {
+  # Obtain predictions
+  knn.en <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type), 
+              test = dplyr::select(df, -cancer_type), 
+              cl = bc_train.oversampled$cancer_type, k = 2) # need some way to pull the predicted classes
+  
+  svm.en <- predict(bc_svm, df)
+  ann.en <- predict(bc_ann, df)
+  
+  # Find the predicted class
+  predicted_class <- findPrediction(knn.en, svm.en, ann.en)
+}
+
+# Function to find the predicted class
+findPrediction <- function(knn_pred, svm_pred, ann_pred) {
+  # Find number of rows
+  rows <- nrow(svm_pred)
+  
+  # Create empty dataframe of predicted classes
+  predictions <- rep('', rows)
+  
+  # Identify similarity in models
+  for (i in 1:rows) {
+    if (svm_pred$class[i] == knn_pred$class[i] | # need to figure out the correct attribute call
+        svm_pred$class[i] == ann_pred$class[i]) {
+          predictions[i] == svm_pred$class[i]
+        } else if (ann_pred$class[i] == knn_pred$class[1]) {
+          predictions[i] == ann_pred$class[i]
+        } else {
+          'no confidence'
+        }
+  }
+  
+  return(predictions)
+  
+}
+```
 
 # Conclusions
 
@@ -413,4 +487,9 @@ Basic Information About Breast Cancer. (2021, September 20). Centers for Disease
 
 Mahmudah, K., Purnama, B., Indriani, F., & Satou, K. (2021). Machine learning algorithms for predicting chronic obstructive pulmonary disease from gene expression data with class imbalance. Proceedings of the 14th International Joint Conference on Biomedical Engineering Systems and Technologies. https://doi.org/10.5220/0010316501480153 
 
+Pereira, B., Chin, S.-F., Rueda, O. M., Vollan, H.-K. M., Provenzano, E., Bardwell, H. A., Pugh, M., Jones, L., Russell, R., Sammut, S.-J., Tsui, D. W., Liu, B., Dawson, S.-J., Abraham, J., Northen, H., Peden, J. F., Mukherjee, A., Turashvili, G., Green, A. R., … Caldas, C. (2016). The somatic mutation profiles of 2,433 breast cancers refine their genomic and transcriptomic landscapes. Nature Communications, 7(1). https://doi.org/10.1038/ncomms11479 
+
 Tabares-Soto, R., Orozco-Arias, S., Romero-Cano, V., Segovia Bucheli, V., Rodríguez-Sotelo, J. L., & Jiménez-Varón, C. F. (2020). A comparative study of machine learning and deep learning algorithms to classify cancer types based on microarray gene expression data. PeerJ Computer Science, 6. https://doi.org/10.7717/peerj-cs.270 
+
+Yuan, F., Lu, L., & Zou, Q. (2020). Analysis of gene expression profiles of lung cancer subtypes with machine learning algorithms. Biochimica Et Biophysica Acta (BBA) - Molecular Basis of Disease, 1866(8), 165822. https://doi.org/10.1016/j.bbadis.2020.165822 
+
