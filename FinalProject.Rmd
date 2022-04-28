@@ -326,14 +326,43 @@ for this project.
 
 ```{r}
 # Create kNN model
-bc.knn <- train(factor(cancer_type) ~ ., data = bc_train.oversampled, method = 'knn',
-                preProcess = c('center', 'scale'), tuneGrid = data.frame(k = 2))
+# bc.knn <- train(factor(cancer_type) ~ ., data = bc_train.oversampled, method = 'knn',
+#                 preProcess = c('center', 'scale'), tuneGrid = data.frame(k = 2))
+max_k <- 50
+accuracy <- rep(0, max_k)
+auc_vals <- rep(0, max_k)
 
-bc_knn.pred <- predict(bc.knn, dplyr::select(bc_test, -cancer_type))
+for (i in 1:max_k) {
+  # Run the kNN model
+  bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
+              test = dplyr::select(bc_test, -cancer_type), 
+              cl = factor(bc_train.oversampled$cancer_type,
+                          levels = c('Breast Invasive Lobular Carcinoma',
+                                     'Breast Invasive Ductal Carcinoma')), 
+              k = i)
+  
+  # Find Accuracy
+  ct <- CrossTable(x = bc_test$cancer_type, y = bc_knn, prop.chisq = F)$t
+  accuracy[i] <- findAccuracy(ct)
+  
+  # Find Kappa
+  auc_vals[i] <- auc(as.numeric(factor(bc_test$cancer_type,
+                                       levels = c('Breast Invasive Lobular Carcinoma',
+                                                  'Breast Invasive Ductal Carcinoma'))),
+                     as.numeric(factor(bc_knn)))
+}
 
-# Create Cross Table to verify accuracy
-knn.cross <- CrossTable(x = bc_test$cancer_type, y = bc_knn.pred, 
-                        prop.chisq = F)
+# Plot accuracy
+data.frame(accuracy) %>%
+  ggplot(aes(x = seq(1, max_k), y = accuracy)) +
+  geom_line() +
+  labs(x = 'k')
+
+# Plot Kappa
+data.frame(auc_vals) %>%
+  ggplot(aes(x = seq(1, max_k), y = auc_vals)) +
+  geom_line() +
+  labs(x = 'k')
 ```
 
 In this section I created a k nearest neighbors model using 2 values of k. 
