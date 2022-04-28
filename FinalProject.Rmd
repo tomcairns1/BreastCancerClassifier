@@ -326,28 +326,17 @@ for this project.
 
 ```{r}
 # Create kNN model
-bc.knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type), 
-              test = dplyr::select(bc_test, -cancer_type), 
-              cl = bc_train.oversampled$cancer_type, k = 2)
+bc.knn <- train(factor(cancer_type) ~ ., data = bc_train.oversampled, method = 'knn',
+                preProcess = c('center', 'scale'), tuneGrid = data.frame(k = 2))
+
+bc_knn.pred <- predict(bc.knn, dplyr::select(bc_test, -cancer_type))
 
 # Create Cross Table to verify accuracy
-knn.cross <- CrossTable(x = bc_test$cancer_type, y = bc.knn, 
+knn.cross <- CrossTable(x = bc_test$cancer_type, y = bc_knn.pred, 
                         prop.chisq = F)
 ```
 
 In this section I created a k nearest neighbors model using 2 values of k. 
-This model has an accuracy of 77.9%. 
-
-The precision of Breast Invasive Ductal Carcinoma is 80.67% (363 / 450) and the
-recall is 94.2% (363 / 385).
-
-The precision of Breast Invasive Lobular Carcinoma is 22.2% (20 / 31) and the 
-recall is 19% (8 / 42). **UPDATE THIS**
-
-From this model we can see that the most accurate classification is Breast
-Invasive Ductal Carcinoma. Neither of the other two categories are well
-classified. I think this is largely due to the imbalance in the categories
-of the data set.
 
 ```{r}
 # Function to find the Accuracy
@@ -363,8 +352,8 @@ paste('The kappa statistic of the kNN model is:',
       round(kappa.knn$Unweighted[[1]], 3))
 ```
 
-This model had an overall accuracy of 77.8% but a Cohen's kappa statistic of
-only 0.166. This shows poor performance by the model and reinforces the concern
+This model had an overall accuracy of 29.9 with a Cohen's kappa statistic of
+only 0.029. This shows poor performance by the model and reinforces the concern
 that the imbalance in the data set is introducing bias in the model.
 
 
@@ -401,9 +390,34 @@ kappa.svm <- Kappa(svm.cross$t)
 paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
 ```
 
-Here we can see the accuracy of our model is 88.7% with a kappa statistic of
-0.4736. This is a much better fit of the data than the kNN model.
+Here we can see the accuracy of our model is 83.8% with a kappa statistic of
+0.21. This is a much better fit of the data than the kNN model.
 
+```{r}
+# Hypertune the model
+bc_svm.hypertune <- train(cancer_type ~ ., data = bc_train.oversampled, 
+                method = 'svmRadial')
+bc_svm.pred.h1 <- predict(bc_svm.hypertune, bc_test)
+
+# bc_svm.hypertune2 <- train(cancer_type ~ ., data = bc_train.oversampled, 
+#                 method = 'svmPoly')
+# bc_svm.pred.h2 <- predict(bc_svm.hypertune2, bc_test)
+
+# Create CrossTable
+svm.cross.h1 <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred.h1,
+                        prop.chisq = F)
+
+# Find accuracy
+accuracy.svm <- findAccuracy(svm.cross.h1$t)
+paste('The accuracy of the model is:', round(accuracy.svm, 4))
+
+# Find kappa
+kappa.svm <- Kappa(svm.cross.h1$t)
+paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
+```
+
+Using the argument `preProcess = c('center', 'scale')` did not improve the model
+performance (not pictured).
 
 ## ANN
 
@@ -415,9 +429,11 @@ predicting cancer type from gene expression data.
 ```{r neural-net, include=FALSE}
 # Train the model
 bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'avNNet')
+bc_ann1 <- nnet(x = dplyr::select(bc_train.oversampled, -cancer_type), 
+                y = as.numeric(factor(bc_train.oversampled$cancer_type)), size = 2)
 
 # Find predictions
-bc_ann.pred <- predict(bc_ann, bc_test)
+bc_ann.pred <- predict(bc_ann1, dplyr::select(bc_test, -cancer_type))
 ```
 
 ```{r evaluate-nn}
@@ -426,6 +442,8 @@ ann.cross <- CrossTable(x = bc_test$cancer_type, y = bc_ann.pred,
                         prop.chisq = F)
 
 # Find kappa
+accuracy.ann <- findAccuracy(ann.cross$t)
+paste('The accuracy is:', round(accuracy.ann, 4))
 kappa.ann <- Kappa(ann.cross$t)
 paste('The Kappa Statistic is:', round(kappa.ann$Unweighted[[1]], 4))
 ```
