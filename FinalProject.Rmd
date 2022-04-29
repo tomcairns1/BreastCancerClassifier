@@ -467,11 +467,11 @@ predicting cancer type from gene expression data.
 ```{r neural-net, include=FALSE}
 # Train the model
 bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'avNNet')
-bc_ann1 <- nnet(x = dplyr::select(bc_train.oversampled, -cancer_type), 
-                y = as.numeric(factor(bc_train.oversampled$cancer_type)), size = 2)
+# bc_ann1 <- nnet(x = dplyr::select(bc_train.oversampled, -cancer_type), 
+#                 y = as.numeric(factor(bc_train.oversampled$cancer_type)), size = 2)
 
 # Find predictions
-bc_ann.pred <- predict(bc_ann1, dplyr::select(bc_test, -cancer_type))
+bc_ann.pred <- predict(bc_ann, dplyr::select(bc_test, -cancer_type))
 ```
 
 ```{r evaluate-nn}
@@ -486,7 +486,7 @@ kappa.ann <- Kappa(ann.cross$t)
 paste('The Kappa Statistic is:', round(kappa.ann$Unweighted[[1]], 4))
 ```
 
-Neural network has classified everything as the Breast Invasive Ductal Carcinoma.
+Neural network has an accuracy of 87.5% and a kappa statistic of 0.281.
 
 ## Ensemble
 
@@ -537,26 +537,19 @@ adaboost <- function(test_data, ml_1, ml_2, ml_3) {
   w <- rep(1 / nrow(test_data), nrow(test_data))
   
   # Select samples
-  obs <- sample(test_data, size = nrow(test_data), prob = w, replace = T)
+  obs <- sample_n(test_data, size = nrow(test_data), weight = w, replace = T)
 
   # Create predictions
   p1 <- predict(ml_1, obs)
   
   # Find error
-  e <- sum(w[p1 == test_data$classes])
+  e <- findError(p1, w, test_data)
   
   # Measure performance
-  alpha <- (1 / 2) * ln((1 - e) / e)
+  alpha <- findPerformance(e)
   
   # Set new weight
-  w2 <- rep(0, nrow(test_data))
-  for (i in 1:nrow(obs)) {
-    if (p1[i] == obs$cancer_type[i]) {
-      w2[i] <- w[i] + exp(alpha)
-    } else {
-      w2[i] <- w[i] + exp(-alpha)
-    }
-  }
+  w2 <- setNewWeight(w, p1, test_data, alpha)
   
   n <- sum(w2)
   nw <- w2 / n
@@ -580,12 +573,23 @@ findError <- function(predictions, weight, test_data) {
 
 # Helper function to find performance
 findPerformance <- function(e) {
-  alpha <- (1 / 2) * ln((1 - e) / e)
+  alpha <- (1 / 2) * log((1 - e) / e)
   return(alpha)
 }
 
 # Set the new weight
-setNewWeight <- function(weight, prediction, test_data, observations)
+setNewWeight <- function(weight, prediction, test_data, alpha) {
+  w2 <- rep(0, nrow(test_data))
+  for (i in 1:nrow(test_data)) {
+    if (prediction[i] == test_data$cancer_type[i]) {
+      w2[i] <- weight[i] + exp(alpha)
+    } else {
+      w2[i] <- weight[i] + exp(-alpha)
+    }
+  }
+  
+  return(w2)
+}
 ```
 
 # Conclusions
@@ -593,17 +597,21 @@ setNewWeight <- function(weight, prediction, test_data, observations)
 
 # References
 
-Ang, J. C., Mirzal, A., Haron, H., & Hamed, H. N. (2016). Supervised, unsupervised, and semi-supervised feature selection: A review on gene selection. IEEE/ACM Transactions on Computational Biology and Bioinformatics, 13(5), 971–989. https://doi.org/10.1109/tcbb.2015.2478454 
+Ajeeth, J. (2020, December). *Implementing the AdaBoost Algorithm From Scratch.* KDNuggets. Retrieved April 29, 2022 from, https://www.kdnuggets.com/2020/12/implementing-adaboost-algorithm-from-scratch.html
 
-Barroso-Sousa, R., & Metzger-Filho, O. (2016). Differences between invasive lobular and invasive ductal carcinoma of the breast: Results and therapeutic implications. Therapeutic Advances in Medical Oncology, 8(4), 261–266. https://doi.org/10.1177/1758834016644156 
+Ang, J. C., Mirzal, A., Haron, H., & Hamed, H. N. (2016). Supervised, unsupervised, and semi-supervised feature selection: A review on gene selection. *IEEE/ACM Transactions on Computational Biology and Bioinformatics, 13*(5), 971–989. https://doi.org/10.1109/tcbb.2015.2478454 
 
-Basic Information About Breast Cancer. (2021, September 20). Centers for Disease Control and Prevention. Retrieved April 24, 2022 from, https://www.cdc.gov/cancer/breast/basic_info/index.htm
+Barroso-Sousa, R., & Metzger-Filho, O. (2016). Differences between invasive lobular and invasive ductal carcinoma of the breast: Results and therapeutic implications. *Therapeutic Advances in Medical Oncology, 8*(4), 261–266. https://doi.org/10.1177/1758834016644156 
 
-Mahmudah, K., Purnama, B., Indriani, F., & Satou, K. (2021). Machine learning algorithms for predicting chronic obstructive pulmonary disease from gene expression data with class imbalance. Proceedings of the 14th International Joint Conference on Biomedical Engineering Systems and Technologies. https://doi.org/10.5220/0010316501480153 
+*Basic Information About Breast Cancer*. (2021, September 20). Centers for Disease Control and Prevention. Retrieved April 24, 2022 from, https://www.cdc.gov/cancer/breast/basic_info/index.htm
 
-Pereira, B., Chin, S.-F., Rueda, O. M., Vollan, H.-K. M., Provenzano, E., Bardwell, H. A., Pugh, M., Jones, L., Russell, R., Sammut, S.-J., Tsui, D. W., Liu, B., Dawson, S.-J., Abraham, J., Northen, H., Peden, J. F., Mukherjee, A., Turashvili, G., Green, A. R., … Caldas, C. (2016). The somatic mutation profiles of 2,433 breast cancers refine their genomic and transcriptomic landscapes. Nature Communications, 7(1). https://doi.org/10.1038/ncomms11479 
+Blagus, R., & Lusa, L. (2012). Evaluation of smote for high-dimensional class-imbalanced microarray data. *2012 11th International Conference on Machine Learning and Applications*. https://doi.org/10.1109/icmla.2012.183 
 
-Tabares-Soto, R., Orozco-Arias, S., Romero-Cano, V., Segovia Bucheli, V., Rodríguez-Sotelo, J. L., & Jiménez-Varón, C. F. (2020). A comparative study of machine learning and deep learning algorithms to classify cancer types based on microarray gene expression data. PeerJ Computer Science, 6. https://doi.org/10.7717/peerj-cs.270 
+Mahmudah, K., Purnama, B., Indriani, F., & Satou, K. (2021). Machine learning algorithms for predicting chronic obstructive pulmonary disease from gene expression data with class imbalance. *Proceedings of the 14th International Joint Conference on Biomedical Engineering Systems and Technologies*. https://doi.org/10.5220/0010316501480153 
 
-Yuan, F., Lu, L., & Zou, Q. (2020). Analysis of gene expression profiles of lung cancer subtypes with machine learning algorithms. Biochimica Et Biophysica Acta (BBA) - Molecular Basis of Disease, 1866(8), 165822. https://doi.org/10.1016/j.bbadis.2020.165822 
+Pereira, B., Chin, S.-F., Rueda, O. M., Vollan, H.-K. M., Provenzano, E., Bardwell, H. A., Pugh, M., Jones, L., Russell, R., Sammut, S.-J., Tsui, D. W., Liu, B., Dawson, S.-J., Abraham, J., Northen, H., Peden, J. F., Mukherjee, A., Turashvili, G., Green, A. R., … Caldas, C. (2016). The somatic mutation profiles of 2,433 breast cancers refine their genomic and transcriptomic landscapes. *Nature Communications, 7*(1). https://doi.org/10.1038/ncomms11479 
+
+Tabares-Soto, R., Orozco-Arias, S., Romero-Cano, V., Segovia Bucheli, V., Rodríguez-Sotelo, J. L., & Jiménez-Varón, C. F. (2020). A comparative study of machine learning and deep learning algorithms to classify cancer types based on microarray gene expression data. *PeerJ Computer Science, 6*. https://doi.org/10.7717/peerj-cs.270 
+
+Yuan, F., Lu, L., & Zou, Q. (2020). Analysis of gene expression profiles of lung cancer subtypes with machine learning algorithms. *Biochimica Et Biophysica Acta (BBA) - Molecular Basis of Disease, 1866*(8), 165822. https://doi.org/10.1016/j.bbadis.2020.165822 
 
