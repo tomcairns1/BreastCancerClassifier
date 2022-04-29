@@ -466,7 +466,9 @@ predicting cancer type from gene expression data.
 
 ```{r neural-net, include=FALSE}
 # Train the model
-bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'avNNet')
+grid <- expand.grid(size = 3, decay = 0)
+bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, 
+                method = 'nnet', tuneGrid = grid)
 # bc_ann1 <- nnet(x = dplyr::select(bc_train.oversampled, -cancer_type), 
 #                 y = as.numeric(factor(bc_train.oversampled$cancer_type)), size = 2)
 
