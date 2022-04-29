@@ -327,6 +327,13 @@ numeric, normalized data, with a target classification. Therefore it is perfect
 for this project. 
 
 ```{r}
+# Function to find the Accuracy
+findAccuracy <- function(cm) {
+    accuracy = (cm[1] + cm[4]) / sum(cm)
+}
+```
+
+```{r}
 # Initialize variables
 max_k <- 200
 accuracy <- rep(0, max_k)
@@ -374,17 +381,12 @@ highest accuracy and AUC.
 ```
 
 ```{r}
-# Function to find the Accuracy
-findAccuracy <- function(cm) {
-    accuracy = (cm[1] + cm[4]) / sum(cm)
-}
-
 # Find the Accuracy
-accuracy.knn <- findAccuracy(knn.cross$t)
-paste('The accuracy of this kNN model is:', round(accuracy.knn, 3))
-kappa.knn <- Kappa(knn.cross$t)
-paste('The kappa statistic of the kNN model is:', 
-      round(kappa.knn$Unweighted[[1]], 3))
+# accuracy.knn <- findAccuracy(knn.cross$t)
+# paste('The accuracy of this kNN model is:', round(accuracy.knn, 3))
+# kappa.knn <- Kappa(knn.cross$t)
+# paste('The kappa statistic of the kNN model is:', 
+#       round(kappa.knn$Unweighted[[1]], 3))
 ```
 
 This model had an overall accuracy of 29.9 with a Cohen's kappa statistic of
@@ -432,7 +434,7 @@ Here we can see the accuracy of our model is 81.7% with a kappa statistic of
 # Hypertune the model
 bc_svm.radial <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'svmRadial')
-bc_svm.pred.r <- predict(bc_svm.hypertune, bc_test)
+bc_svm.pred.r <- predict(bc_svm.radial, bc_test)
 
 # bc_svm.hypertune2 <- train(cancer_type ~ ., data = bc_train.oversampled, 
 #                 method = 'svmPoly')
@@ -526,6 +528,64 @@ findPrediction <- function(knn_pred, svm_pred, ann_pred) {
   return(predictions)
   
 }
+```
+
+```{r, adaboost}
+# Adaboost Function
+adaboost <- function(test_data, ml_1, ml_2, ml_3) {
+  # Set initial weights for sampling
+  w <- rep(1 / nrow(test_data), nrow(test_data))
+  
+  # Select samples
+  obs <- sample(test_data, size = nrow(test_data), prob = w, replace = T)
+
+  # Create predictions
+  p1 <- predict(ml_1, obs)
+  
+  # Find error
+  e <- sum(w[p1 == test_data$classes])
+  
+  # Measure performance
+  alpha <- (1 / 2) * ln((1 - e) / e)
+  
+  # Set new weight
+  w2 <- rep(0, nrow(test_data))
+  for (i in 1:nrow(obs)) {
+    if (p1[i] == obs$cancer_type[i]) {
+      w2[i] <- w[i] + exp(alpha)
+    } else {
+      w2[i] <- w[i] + exp(-alpha)
+    }
+  }
+  
+  n <- sum(w2)
+  nw <- w2 / n
+  
+  obs2 <- sample(test_data, prob = nw, replacement = T)
+  
+  p2 <- predict(ml_2, obs2)
+  
+  e2 <- sum(w2[p2 == test_data$classes])
+  
+  alpha <- (1 / 2) * ln((1 - e2) / e2)
+  
+  
+}
+
+# Helper function for finding error
+findError <- function(predictions, weight, test_data) {
+  e <- sum(weight[predictions == test_data$classes])
+  return(e)
+}
+
+# Helper function to find performance
+findPerformance <- function(e) {
+  alpha <- (1 / 2) * ln((1 - e) / e)
+  return(alpha)
+}
+
+# Set the new weight
+setNewWeight <- function(weight, prediction, test_data, observations)
 ```
 
 # Conclusions
