@@ -56,7 +56,9 @@ library(class)
 library(gmodels)
 library(vcd)
 library(nnet)
-library(imbalance)
+# library(imbalance)
+library(pROC)
+library(smotefamily)
 ```
 
 ## Explore Data
@@ -293,11 +295,13 @@ Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
-minority_cases <- mwmote(bc_train, numInstances = 814,
-                         classAttr = 'cancer_type')
-
-# Add to the dataset
-bc_train.oversampled <- rbind(bc_train, minority_cases)
+# minority_cases <- mwmote(bc_train, numInstances = 814,
+#                          classAttr = 'cancer_type')
+minority_cases <- SMOTE(dplyr::select(bc_train, -cancer_type), 
+                        target = bc_train$cancer_type, K = 5, dup_size = 0)
+minority_cases.data <- minority_cases$data
+minority_cases.data$cancer_type = minority_cases.data$class
+bc_train.oversampled <- dplyr::select(minority_cases.data, -class)
 
 # Check that it worked
 table(bc_train.oversampled$cancer_type)
@@ -328,7 +332,7 @@ for this project.
 # Create kNN model
 # bc.knn <- train(factor(cancer_type) ~ ., data = bc_train.oversampled, method = 'knn',
 #                 preProcess = c('center', 'scale'), tuneGrid = data.frame(k = 2))
-max_k <- 50
+max_k <- 200
 accuracy <- rep(0, max_k)
 auc_vals <- rep(0, max_k)
 
@@ -345,7 +349,7 @@ for (i in 1:max_k) {
   ct <- CrossTable(x = bc_test$cancer_type, y = bc_knn, prop.chisq = F)$t
   accuracy[i] <- findAccuracy(ct)
   
-  # Find Kappa
+  # Find AUC
   auc_vals[i] <- auc(as.numeric(factor(bc_test$cancer_type,
                                        levels = c('Breast Invasive Lobular Carcinoma',
                                                   'Breast Invasive Ductal Carcinoma'))),
