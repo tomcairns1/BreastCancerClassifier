@@ -466,26 +466,53 @@ predicting cancer type from gene expression data.
 
 ```{r neural-net, include=FALSE}
 # Train the model
-grid <- expand.grid(size = 3, decay = 0)
-bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, 
-                method = 'nnet', tuneGrid = grid)
-# bc_ann1 <- nnet(x = dplyr::select(bc_train.oversampled, -cancer_type), 
-#                 y = as.numeric(factor(bc_train.oversampled$cancer_type)), size = 2)
+# Find the best neural net model
+max_its <- 10
+ann.acc <- rep(0, max_its)
+ann.k <- rep(0, max_its)
 
-# Find predictions
-bc_ann.pred <- predict(bc_ann, dplyr::select(bc_test, -cancer_type))
+for (i in 1:max_its) {
+  grid <- expand.grid(size = i, decay = 0)
+  ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'nnet',
+               tunrGrid = grid)
+  
+  pred <- predict(ann, dplyr::select(bc_test, -cancer_type))
+  
+  ct <- CrossTable(x = bc_test$cancer_type, y = pred, prop.chisq = F)
+  ann.acc[i] <- findAccuracy(ct$t)
+  ann.k[i] <- Kappa(ct$t)
+}
+
+data.frame(ann.acc) %>%
+  ggplot(aes(x = seq(1:max_its), y = ann.acc)) +
+  geom_line() +
+  labs(title = 'Accuracy of Neural Net Model', x = 'Number of Neurons')
+
+data.frame(ann.k) %>%
+  ggplot(aes(x = seq(1:max_its), y = ann.k)) +
+  geom_line() +
+  labs(title = 'Kappa of Neural Net Model', x = 'Number of Neurons')
 ```
 
 ```{r evaluate-nn}
+grid <- expand.grid(size = 3, decay = 0)
+bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, 
+                method = 'nnet', tuneGrid = grid)
+
+
+# Find predictions
+bc_ann.pred <- predict(bc_ann, dplyr::select(bc_test, -cancer_type))
+
 # Create CrossTable
 ann.cross <- CrossTable(x = bc_test$cancer_type, y = bc_ann.pred,
                         prop.chisq = F)
 
+
 # Find kappa
 accuracy.ann <- findAccuracy(ann.cross$t)
-paste('The accuracy is:', round(accuracy.ann, 4))
+paste('The accuracy of bc_ann is:', round(accuracy.ann, 4))
 kappa.ann <- Kappa(ann.cross$t)
-paste('The Kappa Statistic is:', round(kappa.ann$Unweighted[[1]], 4))
+paste('The Kappa Statistic of bc_ann is:', round(kappa.ann$Unweighted[[1]], 4))
 ```
 
 Neural network has an accuracy of 87.5% and a kappa statistic of 0.281.
