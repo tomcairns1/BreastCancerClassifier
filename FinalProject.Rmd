@@ -491,53 +491,56 @@ Neural network has an accuracy of 87.5% and a kappa statistic of 0.281.
 ## Ensemble
 
 ```{r}
-# Create a basic ensemble method
-runEnsemble <- function(df) {
-  # Obtain predictions
-  knn.en <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type), 
-              test = dplyr::select(df, -cancer_type), 
-              cl = bc_train.oversampled$cancer_type, k = 2) # need some way to pull the predicted classes
-  
-  svm.en <- predict(bc_svm, df)
-  ann.en <- predict(bc_ann, df)
-  
-  # Find the predicted class
-  predicted_class <- findPrediction(knn.en, svm.en, ann.en)
-}
-
-# Function to find the predicted class
-findPrediction <- function(knn_pred, svm_pred, ann_pred) {
-  # Find number of rows
-  rows <- nrow(svm_pred)
-  
-  # Create empty dataframe of predicted classes
-  predictions <- rep('', rows)
-  
-  # Identify similarity in models
-  for (i in 1:rows) {
-    if (svm_pred$class[i] == knn_pred$class[i] | # need to figure out the correct attribute call
-        svm_pred$class[i] == ann_pred$class[i]) {
-          predictions[i] == svm_pred$class[i]
-        } else if (ann_pred$class[i] == knn_pred$class[1]) {
-          predictions[i] == ann_pred$class[i]
-        } else {
-          'no confidence'
-        }
-  }
-  
-  return(predictions)
-  
-}
+# # Create a basic ensemble method
+# runEnsemble <- function(df) {
+#   # Obtain predictions
+#   knn.en <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type), 
+#               test = dplyr::select(df, -cancer_type), 
+#               cl = bc_train.oversampled$cancer_type, k = 2) # need some way to pull the predicted classes
+#   
+#   svm.en <- predict(bc_svm, df)
+#   ann.en <- predict(bc_ann, df)
+#   
+#   # Find the predicted class
+#   predicted_class <- findPrediction(knn.en, svm.en, ann.en)
+# }
+# 
+# # Function to find the predicted class
+# findPrediction <- function(knn_pred, svm_pred, ann_pred) {
+#   # Find number of rows
+#   rows <- nrow(svm_pred)
+#   
+#   # Create empty dataframe of predicted classes
+#   predictions <- rep('', rows)
+#   
+#   # Identify similarity in models
+#   for (i in 1:rows) {
+#     if (svm_pred$class[i] == knn_pred$class[i] | # need to figure out the correct attribute call
+#         svm_pred$class[i] == ann_pred$class[i]) {
+#           predictions[i] == svm_pred$class[i]
+#         } else if (ann_pred$class[i] == knn_pred$class[1]) {
+#           predictions[i] == ann_pred$class[i]
+#         } else {
+#           'no confidence'
+#         }
+#   }
+#   
+#   return(predictions)
+#   
+# }
 ```
+
+This adaboost algorithm was adapted from Ajeeth (2020).
 
 ```{r, adaboost}
 # Adaboost Function
 adaboost <- function(test_data, ml_1, ml_2, ml_3) {
   # Set initial weights for sampling
-  w <- rep(1 / nrow(test_data), nrow(test_data))
+  n <- nrow(test_data)
+  w <- rep(1 / n, n)
   
   # Select samples
-  obs <- sample_n(test_data, size = nrow(test_data), weight = w, replace = T)
+  obs <- sample_n(test_data, size = n, weight = w, replace = T)
 
   # Create predictions
   p1 <- predict(ml_1, obs)
@@ -546,23 +549,33 @@ adaboost <- function(test_data, ml_1, ml_2, ml_3) {
   e <- findError(p1, w, test_data)
   
   # Measure performance
-  alpha <- findPerformance(e)
+  alpha1 <- findPerformance(e)
   
   # Set new weight
   w2 <- setNewWeight(w, p1, test_data, alpha)
   
-  n <- sum(w2)
-  nw <- w2 / n
-  
-  obs2 <- sample(test_data, prob = nw, replacement = T)
+  obs2 <- sample_n(test_data, size = n, prob = w2, replacement = T)
   
   p2 <- predict(ml_2, obs2)
   
-  e2 <- sum(w2[p2 == test_data$classes])
+  e2 <- findError(p2, w2, test_data)
   
-  alpha <- (1 / 2) * ln((1 - e2) / e2)
+  alpha2 <- findPerformance(e2)
   
+  # Set new weight
+  w3 <- setNewWeight(w2, p2, test_data, alpha2)
   
+  obs3 <- sample_n(test_data, size = n, prob = w3, replacement = T)
+  
+  p3 <- predict(ml_3, obs3)
+  
+  e3 <- findError(p3, w3, test_data)
+
+  alpha3 <- findPerformance(e3)
+  
+  # Find the final prediction
+  fp <- finalPrediction(p1, p2, p3, alpha1, alpha2, alpha3)
+  return(list(p1, p2, p3, fp))
 }
 
 # Helper function for finding error
@@ -579,7 +592,10 @@ findPerformance <- function(e) {
 
 # Set the new weight
 setNewWeight <- function(weight, prediction, test_data, alpha) {
+  # Initialize the new weight vector
   w2 <- rep(0, nrow(test_data))
+  
+  # Adjust the weighted values
   for (i in 1:nrow(test_data)) {
     if (prediction[i] == test_data$cancer_type[i]) {
       w2[i] <- weight[i] + exp(alpha)
@@ -588,7 +604,31 @@ setNewWeight <- function(weight, prediction, test_data, alpha) {
     }
   }
   
+  # Normalize the weights to add up to 1
+  w2 <- normalizeWeight(w2)
   return(w2)
+}
+
+# Helper function to normalize weight
+normalizeWeight <- function(weight) {
+  norm_constant <- sum(weight)
+  norm_weight <- weight / norm_constant
+  
+  return(norm_weight)
+}
+
+# Function to find final predictions
+finalPrediction<- function(p1, p2, p3, alpha1, alpha2, alpha3) {
+  order <- c('Breast Invasive Ductal Carcinoma', 'Breast Invasive Lobular Carcinoma')
+  
+  fp <- alpha1 * (as.numeric(factor(p1, levels = order)) - 1) +
+        alpha2 * (as.numeric(factor(p2, levels = order)) - 1) +
+        alpha3 * (as.numeric(factor(p3, levels = order)) - 1)
+  
+  # Return to class
+  fp <- ifelse(fp <= 0.5, order[1], order[2])
+  
+  return(fp)
 }
 ```
 
