@@ -289,9 +289,9 @@ with all 168 genes.
 
 In this data set I have a major class imbalance problem. This is common in 
 gene expression analysis (Ang et al., 2016; Blagus & Lusa, 2012; Mahmudah et al.,
-2021; Tabares-Soto et al., 2020). Based on the results by Blagus & Lusa (2012),
-it seems that the best method of dealing with this is by using the Synthetic
-Minority Oversamplng Technique (SMOTE).
+2021; Tabares-Soto et al., 2020). Based on the results by Blagus & Lusa (2012)
+and Mahmudah et al., (2021), it seems that the best method of dealing with this 
+is by using the Synthetic Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
@@ -307,17 +307,15 @@ bc_train.oversampled <- dplyr::select(minority_cases.data, -class)
 table(bc_train.oversampled$cancer_type)
 ```
 
-In this code block I used the `mwmote()` function, which stands for majority
-weighted minority oversampling technique. This is a variation of the SMOTE
-technique which aims to limit noisy data. Since I have decided to not use feature
-selection, reducing noisy data is important.
+In this code block I used the `SMOTE()` function.
 
-I added 814 new instances of the minority class, breast invasive lobular
-carcinoma, so that it would have the same number of samples as the majority
+I added new instances of the minority class, breast invasive lobular
+carcinoma, so that it would be close to the same number of samples as the majority
 class, breast invasive ductal carcinoma. 
 
-I created the variable `bc_train.oversampled` which contains equal sizes of each
-class.
+I created the variable `bc_train.oversampled` which contains near equal sizes of 
+each class. The  minority class has 860 instances while the majority has 900
+instances.
 
 # Modeling 
 
@@ -329,13 +327,12 @@ numeric, normalized data, with a target classification. Therefore it is perfect
 for this project. 
 
 ```{r}
-# Create kNN model
-# bc.knn <- train(factor(cancer_type) ~ ., data = bc_train.oversampled, method = 'knn',
-#                 preProcess = c('center', 'scale'), tuneGrid = data.frame(k = 2))
+# Initialize variables
 max_k <- 200
 accuracy <- rep(0, max_k)
 auc_vals <- rep(0, max_k)
 
+# Run the kNN algorithm many times
 for (i in 1:max_k) {
   # Run the kNN model
   bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
@@ -362,14 +359,19 @@ data.frame(accuracy) %>%
   geom_line() +
   labs(x = 'k')
 
-# Plot Kappa
+# Plot AUC
 data.frame(auc_vals) %>%
   ggplot(aes(x = seq(1, max_k), y = auc_vals)) +
   geom_line() +
   labs(x = 'k')
 ```
 
-In this section I created a k nearest neighbors model using 2 values of k. 
+In this section I ran the kNN algorithm 200 times to uncover the model with the
+highest accuracy and AUC.
+
+```{r}
+# Final kNN model
+```
 
 ```{r}
 # Function to find the Accuracy
@@ -423,34 +425,35 @@ kappa.svm <- Kappa(svm.cross$t)
 paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
 ```
 
-Here we can see the accuracy of our model is 83.8% with a kappa statistic of
+Here we can see the accuracy of our model is 81.7% with a kappa statistic of
 0.21. This is a much better fit of the data than the kNN model.
 
 ```{r}
 # Hypertune the model
-bc_svm.hypertune <- train(cancer_type ~ ., data = bc_train.oversampled, 
+bc_svm.radial <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'svmRadial')
-bc_svm.pred.h1 <- predict(bc_svm.hypertune, bc_test)
+bc_svm.pred.r <- predict(bc_svm.hypertune, bc_test)
 
 # bc_svm.hypertune2 <- train(cancer_type ~ ., data = bc_train.oversampled, 
 #                 method = 'svmPoly')
 # bc_svm.pred.h2 <- predict(bc_svm.hypertune2, bc_test)
 
 # Create CrossTable
-svm.cross.h1 <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred.h1,
+svm.cross.r <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred.r,
                         prop.chisq = F)
 
 # Find accuracy
-accuracy.svm <- findAccuracy(svm.cross.h1$t)
+accuracy.svm <- findAccuracy(svm.cross.r$t)
 paste('The accuracy of the model is:', round(accuracy.svm, 4))
 
 # Find kappa
-kappa.svm <- Kappa(svm.cross.h1$t)
+kappa.svm <- Kappa(svm.cross.r$t)
 paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
 ```
 
 Using the argument `preProcess = c('center', 'scale')` did not improve the model
-performance (not pictured).
+performance (not pictured). I discovered that using the method 'svmRadial' 
+provided a better accuracy and kappa statistic than the linear model.
 
 ## ANN
 
