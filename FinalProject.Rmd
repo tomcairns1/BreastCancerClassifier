@@ -626,15 +626,17 @@ runEnsemble <- function(df) {
 
   # Find the predicted class
   predicted_class <- findPrediction(knn.en, svm.en, ann.en)
+  
+  return(predicted_class)
 }
 
 # Function to find the predicted class
 findPrediction <- function(knn_pred, svm_pred, ann_pred) {
 
   # Calculate weighted prediction
-  predictions <- (as.numeric(knn_pred) - 1) * knn.w + 
-    (as.numeric(svm.pred) - 1) * svm.w +
-    (as.numeric(ann.pred) - 1) * ann.w
+  predictions <- (as.numeric(factor(knn_pred, levels = bc_order)) - 1) * knn.w + 
+    (as.numeric(factor(svm.pred, levels = bc_order)) - 1) * svm.w +
+    (as.numeric(factor(ann.pred, levels = bc_order)) - 1) * ann.w
   
   # Update predictions to be binary
   predictions = ifelse(predictions < 0.5, 'Breast Invasive Lobular Carcinoma', 
