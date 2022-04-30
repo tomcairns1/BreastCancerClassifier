@@ -445,21 +445,50 @@ classifying cancer type using gene expression (Yuan et al., 2020). SVM is an
 algorithm to be used for classification with numeric, normalized data. It works
 similarly to kNN except it tries to maximize the distance between two groups.
 
-```{r}
+```{r train-svm}
 # Set seed and random number generator
 RNGversion('3.5.2'); set.seed(123)
 
 # Create the model
-bc_svm <- train(cancer_type ~ ., data = bc_train.oversampled, 
+bc_svm.l <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'svmLinear3')
 
 # Predict test data
-bc_svm.pred <- predict(bc_svm, bc_test)
+bc_svm.pred_l <- predict(bc_svm.l, bc_test)
 ```
 
 I created a simple Support Vector Machine model using the svmLinear3 parameter.
 
-```{r}
+```{r evaluate-svm}
+# Create CrossTable
+svm.cross <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred_l,
+                        prop.chisq = F)
+
+# Find accuracy
+accuracy.svm.l <- findAccuracy(svm.cross$t)
+paste('The accuracy of the model is:', round(accuracy.svm.l, 4))
+
+# Find kappa
+kappa.svm.l <- Kappa(svm.cross$t)
+paste('The Kappa Statistic is:', round(kappa.svm.l$Unweighted[[1]], 4))
+```
+
+Here we can see the accuracy of our model is 81.7% with a kappa statistic of
+0.21. This is a much better fit of the data than the kNN model.
+
+```{r hypertune-svm}
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
+# Hypertune the model
+bc_svm <- train(cancer_type ~ ., data = bc_train.oversampled, 
+                method = 'svmRadial')
+bc_svm.pred <- predict(bc_svm, bc_test)
+
+# bc_svm.hypertune2 <- train(cancer_type ~ ., data = bc_train.oversampled, 
+#                 method = 'svmPoly')
+# bc_svm.pred.h2 <- predict(bc_svm.hypertune2, bc_test)
+
 # Create CrossTable
 svm.cross <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred,
                         prop.chisq = F)
@@ -468,46 +497,21 @@ svm.cross <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred,
 accuracy.svm <- findAccuracy(svm.cross$t)
 paste('The accuracy of the model is:', round(accuracy.svm, 4))
 
+# Find the AUC
+auc.svm <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
+               as.numeric(factor(bc_svm.pred, levels = bc_order)))
+paste('The AUC of the model is:', round(auc.svm, 4))
+
 # Find kappa
 kappa.svm <- Kappa(svm.cross$t)
 paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
 ```
 
-Here we can see the accuracy of our model is 81.7% with a kappa statistic of
-0.21. This is a much better fit of the data than the kNN model.
-
-```{r}
-# Set seed and random number generator
-RNGversion('3.5.2'); set.seed(123)
-
-# Hypertune the model
-bc_svm.radial <- train(cancer_type ~ ., data = bc_train.oversampled, 
-                method = 'svmRadial')
-bc_svm.pred.r <- predict(bc_svm.radial, bc_test)
-
-# bc_svm.hypertune2 <- train(cancer_type ~ ., data = bc_train.oversampled, 
-#                 method = 'svmPoly')
-# bc_svm.pred.h2 <- predict(bc_svm.hypertune2, bc_test)
-
-# Create CrossTable
-svm.cross.r <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred.r,
-                        prop.chisq = F)
-
-# Find accuracy
-accuracy.svm <- findAccuracy(svm.cross.r$t)
-paste('The accuracy of the model is:', round(accuracy.svm, 4))
-
-# Find the AUC
-auc.svm <- auc()
-
-# Find kappa
-kappa.svm <- Kappa(svm.cross.r$t)
-paste('The Kappa Statistic is:', round(kappa.svm$Unweighted[[1]], 4))
-```
-
 Using the argument `preProcess = c('center', 'scale')` did not improve the model
 performance (not pictured). I discovered that using the method 'svmRadial' 
-provided a better accuracy and kappa statistic than the linear model.
+provided a better accuracy and kappa statistic than the linear model and the 
+polynomial model. Due to improving the runtime I am not including the output of
+the polynomial svm in my final model. 
 
 ## ANN
 
@@ -593,6 +597,9 @@ ensemble below.
 ## Ensemble
 
 ```{r weighted-vote-ensemble}
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
 # Create a basic ensemble method
 runEnsemble <- function(df) {
   
