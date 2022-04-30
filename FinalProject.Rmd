@@ -131,10 +131,31 @@ kaggle user pulled other molecular profile Ids, whereas I just pulled from
 # Check missing values
 missing_vals <- lapply(bc, is.na)
 paste('The number of missing values is:', sum(unlist(missing_vals)))
+
+# Add data with  missing values
+m1 <- bc[, cancer_type == 'Breast Invasive Lobular Carcinoma'][1]
+m1$ATR <- 0
+m2 <- bc[, cancer_type == 'Breast Invasive Lobular Carcinoma'][2]
+m2$CDH1 <- 0
+m3 <- bc[, cancer_type == 'Breast Invasive Lobular Carcinoma'][3]
+m3$GATA3 <- 0
+
+# Impute missing values
+bc <- rbind(bc, m1, m2, m3)
+bc <- bc %>%
+  mutate(ATR = ifelse(is.na(ATR), median(ATR), ATR),
+         CDH1 = ifelse(is.na(CDH1), median(CDH1), CDH1),
+         GATA3 = ifelse(is.na(GATA3), median(GATA3), GATA3))
 ```
 
 In this code section I check the dataset for missing values. There are no
 missing values in the entire data set.
+
+I added a few rows with missing values to perform imputation. In this data I
+used rows of the Breast Invasive Lobular Carcinoma class since that was the
+minority class. I imputed the missing values using the median since there
+were some outliers in the data and I wanted to include a method that would be
+less affected by outliers. 
 
 ```{r check_normality}
 # Function to check normality
@@ -500,21 +521,14 @@ RNGversion('3.5.2'); set.seed(123)
 
 # Train the model
 # Find the best neural net model
-max_its <- 5
-layers <- rep(c(1, 2), max_its)
-nodes <- rep(seq(1, max_its), 2)
-nodes <- nodes[order(nodes)]
-ann.acc <- data_frame(nodes = nodes, layers)
-ann.acc$acc <- 0
-ann.auc <- data_frame(nodes = nodes, layers)
-ann.auc$auc <- 0
-ann.k <- data_frame(nodes = nodes, layers)
-ann.k$k <- 0
+max_its <- 4
+ann.acc <- rep(0, max_its)
+ann.auc <- rep(0, max_its)
+ann.k <- rep(0, max_its)
 
 for (i in 1:max_its) {
-  for (j in 1:2) {
   # Create the grid of hidden layers
-  grid <- expand.grid(size = c(i, j), decay = 0)
+  grid <- expand.grid(size = i, decay = 0)
   
   # Train the model
   ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'nnet',
@@ -527,34 +541,44 @@ for (i in 1:max_its) {
   ct <- CrossTable(x = bc_test$cancer_type, y = pred, prop.chisq = F)
   
   # Find accuracy
-  ann.acc$acc[i * j] <- findAccuracy(ct$t)
+  ann.acc[i] <- findAccuracy(ct$t)
   
   # Find auc
-  ann.auc$auc[i * j] <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
+  ann.auc[i] <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
                         as.numeric(factor(pred, levels = bc_order)))
   
   # Find kappa
-  ann.k$k[i * j] <- Kappa(ct$t)$Unweighted[[1]]
-  }
+  ann.k[i] <- Kappa(ct$t)$Unweighted[[1]]
 }
 
 # Plot the accuracy
 data.frame(ann.acc) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.acc)) +
   geom_line() +
-  labs(title = 'Accuracy of Neural Net Model', x = 'Number of Neurons') +
+  geom_labs(title = 'Neural Net Accuracy', x = 'Nodes', y = 'Accuracy') +
   theme(panel.background = element_blank(), axis.line = element_line())
 
-# Plot the kappa
+# Plot the AUC
+data.frame(ann.auc) %>%
+  ggplot(aes(x = seq(1:max_its), y = ann.auc)) +
+  geom_line() +
+  geom_labs(title = 'Neural Net AUC', x = 'Nodes', y = 'AUC') +
+  theme(panel.background = element_blank(), axis.line = element_line())
+
+# Plot the kappa statistic
 data.frame(ann.k) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.k)) +
-  geom_line() +
-  labs(title = 'Kappa of Neural Net Model', x = 'Number of Neurons') +
+  geom_line() + 
+  geom_labs(titel = 'Neural Net K', x = 'Nodes', y = 'Accuracy') +
   theme(panel.background = element_blank(), axis.line = element_line())
 ```
 
+Based on these results, my best neural network model contains two layers with
+1 node in each model. It has an accuracy of 0.875, an auc of 0.64, and a kappa
+statistic of 0.26.
+
 ```{r evaluate-nn}
-grid <- expand.grid(size = 3, decay = 0)
+grid <- expand.grid(size = c(1, 2), decay = 0)
 bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'nnet', tuneGrid = grid)
 
