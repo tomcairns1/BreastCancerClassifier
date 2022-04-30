@@ -372,18 +372,18 @@ for (i in 1:max_k) {
   # Run the kNN model
   bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
                 test = dplyr::select(bc_test, -cancer_type), 
-                cl = factor(bc_train.oversampled$cancer_type, levels = bc_order), 
+                cl = bc_train.oversampled$cancer_type, 
                 k = i)
   
   # Create CrossTable
-  ct <- CrossTable(x = factor(bc_test$cancer_type, levels = bc_order), 
-                   y = factor(bc_knn, levels = bc_order), prop.chisq = F)$t
+  ct <- CrossTable(x = bc_test$cancer_type, 
+                   y = bc_knn, prop.chisq = F)$t
   
   # Find Accuracy
   accuracy[i] <- findAccuracy(ct)
   
   # Find AUC
-  auc_vals[i] <- auc(as.numeric(bc_test$cancer_type),
+  auc_vals[i] <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
                      as.numeric(factor(bc_knn, levels = bc_order)))
   
   # Find Kappa
@@ -395,21 +395,21 @@ data.frame(accuracy) %>%
   ggplot(aes(x = seq(1, max_k), y = accuracy)) +
   geom_line() +
   labs(x = 'k', title = 'kNN Accuracy') +
-  theme_minimal()
+  theme(axis.line = element_line(), panel.background = element_blank())
 
 # Plot AUC
 data.frame(auc_vals) %>%
   ggplot(aes(x = seq(1, max_k), y = auc_vals)) +
   geom_line() +
   labs(x = 'k', title = 'kNN AUC') +
-  theme_minimal()
+  theme(axis.line = element_line(), panel.background = element_blank())
 
 # Plot Kappa
 data.frame(kappa_vals) %>%
   ggplot(aes(x = seq(1, max_k), y = kappa_vals)) +
   geom_line() +
   labs(x = 'k', title = 'kNN Kappa') +
-  theme_minimal()
+  theme(axis.line = element_line(), panel.background = element_blank())
 ```
 
 In this section I ran the kNN algorithm 100 times to uncover the model with the
@@ -427,6 +427,9 @@ algorithm to be used for classification with numeric, normalized data. It works
 similarly to kNN except it tries to maximize the distance between two groups.
 
 ```{r}
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
 # Create the model
 bc_svm <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'svmLinear3')
@@ -455,6 +458,9 @@ Here we can see the accuracy of our model is 81.7% with a kappa statistic of
 0.21. This is a much better fit of the data than the kNN model.
 
 ```{r}
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
 # Hypertune the model
 bc_svm.radial <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'svmRadial')
@@ -489,40 +495,62 @@ features. Tabares-Soto et al. (2020) showed the benefit of this algorithm in
 predicting cancer type from gene expression data. 
 
 ```{r neural-net, include=FALSE}
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
 # Train the model
 # Find the best neural net model
-max_its <- 10
-ann.acc <- rep(0, max_its)
-ann.k <- rep(0, max_its)
+max_its <- 5
+layers <- rep(c(1, 2), max_its)
+nodes <- rep(seq(1, max_its), 2)
+nodes <- nodes[order(nodes)]
+ann.acc <- data_frame(nodes = nodes, layers)
+ann.acc$acc <- 0
+ann.auc <- data_frame(nodes = nodes, layers)
+ann.auc$auc <- 0
+ann.k <- data_frame(nodes = nodes, layers)
+ann.k$k <- 0
 
 for (i in 1:max_its) {
-  grid <- expand.grid(size = i, decay = 0)
+  for (j in 1:2) {
+  # Create the grid of hidden layers
+  grid <- expand.grid(size = c(i, j), decay = 0)
+  
+  # Train the model
   ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'nnet',
                tunrGrid = grid)
   
+  # Find the predictions
   pred <- predict(ann, dplyr::select(bc_test, -cancer_type))
   
+  # Create the cross table
   ct <- CrossTable(x = bc_test$cancer_type, y = pred, prop.chisq = F)
-  ann.acc[i] <- findAccuracy(ct$t)
-  ann.k[i] <- Kappa(ct$t)
+  
+  # Find accuracy
+  ann.acc$acc[i * j] <- findAccuracy(ct$t)
+  
+  # Find auc
+  ann.auc$auc[i * j] <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
+                        as.numeric(factor(pred, levels = bc_order)))
+  
+  # Find kappa
+  ann.k$k[i * j] <- Kappa(ct$t)$Unweighted[[1]]
+  }
 }
-
-ann.k <- c(unlist(ann.k)[[1]], unlist(ann.k)[[3]], unlist(ann.k)[[5]],
-           unlist(ann.k)[[7]], unlist(ann.k)[[9]], unlist(ann.k)[[11]],
-           unlist(ann.k)[[13]], unlist(ann.k)[[15]], unlist(ann.k)[[17]],
-           unlist(ann.k)[[19]])
 
 # Plot the accuracy
 data.frame(ann.acc) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.acc)) +
   geom_line() +
-  labs(title = 'Accuracy of Neural Net Model', x = 'Number of Neurons')
+  labs(title = 'Accuracy of Neural Net Model', x = 'Number of Neurons') +
+  theme(panel.background = element_blank(), axis.line = element_line())
 
 # Plot the kappa
 data.frame(ann.k) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.k)) +
   geom_line() +
-  labs(title = 'Kappa of Neural Net Model', x = 'Number of Neurons')
+  labs(title = 'Kappa of Neural Net Model', x = 'Number of Neurons') +
+  theme(panel.background = element_blank(), axis.line = element_line())
 ```
 
 ```{r evaluate-nn}
