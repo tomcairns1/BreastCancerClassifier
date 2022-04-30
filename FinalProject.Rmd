@@ -555,50 +555,40 @@ for (i in 1:max_its) {
 data.frame(ann.acc) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.acc)) +
   geom_line() +
-  geom_labs(title = 'Neural Net Accuracy', x = 'Nodes', y = 'Accuracy') +
+  labs(title = 'Neural Net Accuracy', x = 'Nodes', y = 'Accuracy') +
   theme(panel.background = element_blank(), axis.line = element_line())
 
 # Plot the AUC
 data.frame(ann.auc) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.auc)) +
   geom_line() +
-  geom_labs(title = 'Neural Net AUC', x = 'Nodes', y = 'AUC') +
+  labs(title = 'Neural Net AUC', x = 'Nodes', y = 'AUC') +
   theme(panel.background = element_blank(), axis.line = element_line())
 
 # Plot the kappa statistic
 data.frame(ann.k) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.k)) +
   geom_line() + 
-  geom_labs(titel = 'Neural Net K', x = 'Nodes', y = 'Accuracy') +
+  labs(titel = 'Neural Net K', x = 'Nodes', y = 'Kappa') +
   theme(panel.background = element_blank(), axis.line = element_line())
 ```
 
-Based on these results, my best neural network model contains two layers with
-1 node in each model. It has an accuracy of 0.875, an auc of 0.64, and a kappa
-statistic of 0.26.
+Based on these results, my best neural network model contains 3 nodes. This
+model has an overall accuracy of almost 88%, an AUC value close to 0.65, and a
+kappa statistic of over 0.25. 
 
 ```{r evaluate-nn}
-grid <- expand.grid(size = 1, decay = 0)
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
+# Train the model
+grid <- expand.grid(size = 3, decay = 0)
 bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, 
                 method = 'nnet', tuneGrid = grid)
-
-
-# Find predictions
-bc_ann.pred <- predict(bc_ann, dplyr::select(bc_test, -cancer_type))
-
-# Create CrossTable
-ann.cross <- CrossTable(x = bc_test$cancer_type, y = bc_ann.pred,
-                        prop.chisq = F)
-
-
-# Find kappa
-accuracy.ann <- findAccuracy(ann.cross$t)
-paste('The accuracy of bc_ann is:', round(accuracy.ann, 4))
-kappa.ann <- Kappa(ann.cross$t)
-paste('The Kappa Statistic of bc_ann is:', round(kappa.ann$Unweighted[[1]], 4))
 ```
 
-Neural network has an accuracy of 87.5% and a kappa statistic of 0.281.
+This trained neural network model will be used in my final weighted vote
+ensemble below. 
 
 ## Ensemble
 
