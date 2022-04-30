@@ -1,5 +1,5 @@
 ---
-title: 'Final Project'
+title: 'Breast Cancer Classifier Using METABRIC Gene Expression Data'
 author: Tom Cairns
 output: html_document
 ---
@@ -56,7 +56,6 @@ library(class)
 library(gmodels)
 library(vcd)
 library(nnet)
-# library(imbalance)
 library(pROC)
 library(smotefamily)
 ```
@@ -69,7 +68,9 @@ cbio <- cBioPortal()
 clinical <- clinicalData(api = cbio, studyId = 'brca_metabric')
 all_samples <- allSamples(cbio, 'brca_metabric')
 gene_panel <- getGenePanel(cbio, 'METABRIC_173')
-gene_data <- molecularData(cbio, molecularProfileIds = 'brca_metabric_mrna', entrezGeneIds = gene_panel$entrezGeneId, sampleIds = all_samples$sampleId)
+gene_data <- molecularData(cbio, molecularProfileIds = 'brca_metabric_mrna', 
+                           entrezGeneIds = gene_panel$entrezGeneId, 
+                           sampleIds = all_samples$sampleId)
 ```
 
 In my initial plan for this project I downloaded the data from kaggle:https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
@@ -82,14 +83,19 @@ expression data from the study.
 ```{r clean-data}
 gene_data <- gene_data$brca_metabric_mrna
 
+# Set breast cancer order
+bc_order <- c('Breast Invasive Lobular Carcinoma', 
+              'Breast Invasive Ductal Carcinoma')
+
 # Combine data sets and extract important information
 bc <- gene_data %>%
   left_join(gene_panel) %>%
   left_join(clinical) %>%
   select(sampleId, value, hugoGeneSymbol, CANCER_TYPE_DETAILED) %>%
   pivot_wider(names_from = hugoGeneSymbol) %>%
-  filter(CANCER_TYPE_DETAILED %in% c('Breast Invasive Ductal Carcinoma',
-                                     'Breast Invasive Lobular Carcinoma'))
+  filter(CANCER_TYPE_DETAILED %in% bc_order) %>%
+  mutate(cancer_type = factor(CANCER_TYPE_DETAILED, levels = bc_order)) %>%
+  select(-CANCER_TYPE_DETAILED)
 ```
 
 In this section I join the gene_panel and clinical dataframes to the gene_data
@@ -99,7 +105,9 @@ Since this dataset was in a long format, where each row contained a unique
 sample and gene, I had to pivot it wider so that each row was a unique
 sample. Finally I filtered the cancer_type_detailed to contain the two types
 of cancer that I am interested in distinguishing between: Breast Invasive
-Ductal Carcinoma and Breast Invasive Lobular Carcinoma.
+Ductal Carcinoma and Breast Invasive Lobular Carcinoma. I changed this column
+to be a factor for ease of use downstream and I changed the name from
+CANCER_TYPE_DETAILED to cancer_type.
 
 There are some slight deviations here from my original plan. First, I am
 choosing to run a binary classifier for this instead of the three classes that
@@ -129,9 +137,6 @@ In this code section I check the dataset for missing values. There are no
 missing values in the entire data set.
 
 ```{r check_normality}
-# Create table of target feature
-table(bc$cancer_type_detailed)
-
 # Function to check normality
 isNormal <- function(col) {
     p <- shapiro.test(col)$p.value
@@ -142,10 +147,13 @@ isNormal <- function(col) {
 }
 
 # Find the normality of each column
-normal_cols <- lapply(bc[,-c(1, 2)], isNormal)
+normal_cols <- lapply(dplyr::select(bc, -sampleId, -cancer_type), isNormal)
 
 # Identify the non normal columns
 which(normal_cols == F)
+
+# Create table of target feature
+table(bc$cancer_type)
 ```
 
 In this code block I use a Shapiro-Wilk test of normality to find the columns
@@ -153,6 +161,15 @@ that do not express normal distribution. From this I found that genes PIK3R1,
 NCOR2, SF3B1, AHNAK2, and RASGEF1B are not normally distributed. The number
 under each gene name represents the column index - 2 for the two character
 columns that were removed. 
+
+I also checked the number of each class in the dataset. The number of instances
+of Breast Invasive Lobular Carcinoma is about 1/10th of the instances of
+Breast Invasive Ductal Carcinoma. This agrees with the number of diagnoses in
+the population as described in the literature (Barroso-Sousa & Metzger-Filho, 2016).
+While class imbalance has a major impact on the models, knowing that this is
+due to the real-world application and not from poor data collection techniques
+means that it is something we need to account for and ensure the model is
+robust.
 
 ```{r visualize-nonnormal-features}
 # Create plots for the not-normally distributed plots
@@ -171,7 +188,8 @@ but is either slightly skewed or contains outliers.
 
 ```{r normalize-data}
 # Normalize the data using z-score
-bc.scaled <- as.data.frame(lapply(bc[,-c(1, 2)], scale))
+bc.scaled <- as.data.frame(lapply(dplyr::select(bc, -sampleId, -cancer_type), 
+                                  scale))
 
 # Function to count number of outliers per column
 findOutliers <- function(col) {
@@ -186,7 +204,7 @@ In this code block I normalized the data by converting the values to z-scores.
 I then found the number of outliers for each column, which I am defining as 
 greater than 3 standard deviations from the mean. Most columns have a couple
 outliers, but CDKN2A, GLDC, TTYH1, COL22A1, and FRMD3 have over 40 outliers
-each.
+each. I will have to impute the missing values in this data set.
 
 ```{r outlier-control}
 # Function to replace outliers with NA
@@ -196,7 +214,7 @@ removeOutliers <- function(col) {
 
 # Remove the outliers
 bc.removed_outliers <- as.data.frame(lapply(bc.scaled, removeOutliers))
-bc.removed_outliers$cancer_type <- bc$CANCER_TYPE_DETAILED
+bc.removed_outliers$cancer_type <- bc$cancer_type
 
 # Check the histograms again
 lapply(bc.removed_outliers[,which(normal_cols == F)], createHist)
@@ -219,7 +237,9 @@ findCorrelation(cor.matrix, cutoff = threshold)
 In this section I looked for instances of potential collinearity. I used a threshold
 of 0.9 and found no columns with a Pearson's correlation above this value. There
 were no columns that showed colinearity. This means I can continue my analysis 
-without concern.
+without concern. I used Pearson's correlation coefficient since all of the data
+is normally distributed.
+
 
 
 # Data Preparation
@@ -227,6 +247,9 @@ without concern.
 ## Split Data
 
 ```{r split-data}
+# Set the seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
 # Split the data to maintain proportions of classes
 sample <- createDataPartition(y = bc.removed_outliers$cancer_type,
                               p = 0.6,
@@ -295,12 +318,13 @@ is by using the Synthetic Minority Oversamplng Technique (SMOTE).
 
 ```{r over-sampling}
 # Run an oversampling method
-# minority_cases <- mwmote(bc_train, numInstances = 814,
-#                          classAttr = 'cancer_type')
 minority_cases <- SMOTE(dplyr::select(bc_train, -cancer_type), 
                         target = bc_train$cancer_type, K = 5, dup_size = 0)
+
+# Extract the data and change variable names
 minority_cases.data <- minority_cases$data
-minority_cases.data$cancer_type = minority_cases.data$class
+minority_cases.data$cancer_type = factor(minority_cases.data$class, 
+                                         levels = bc_order)
 bc_train.oversampled <- dplyr::select(minority_cases.data, -class)
 
 # Check that it worked
@@ -326,72 +350,72 @@ previously in the literature (Tabares-Soto et al., 2020). kNN works well for
 numeric, normalized data, with a target classification. Therefore it is perfect
 for this project. 
 
-```{r}
+```{r find-accuracy-function}
 # Function to find the Accuracy
 findAccuracy <- function(cm) {
     accuracy = (cm[1] + cm[4]) / sum(cm)
 }
 ```
 
-```{r}
+```{r find-optimal-knn}
+# Set seed and random number generator
+RNGversion('3.5.2'); set.seed(123)
+
 # Initialize variables
-max_k <- 200
+max_k <- 25
 accuracy <- rep(0, max_k)
 auc_vals <- rep(0, max_k)
+kappa_vals <- rep(0, max_k)
 
 # Run the kNN algorithm many times
 for (i in 1:max_k) {
   # Run the kNN model
   bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
-              test = dplyr::select(bc_test, -cancer_type), 
-              cl = factor(bc_train.oversampled$cancer_type,
-                          levels = c('Breast Invasive Lobular Carcinoma',
-                                     'Breast Invasive Ductal Carcinoma')), 
-              k = i)
+                test = dplyr::select(bc_test, -cancer_type), 
+                cl = factor(bc_train.oversampled$cancer_type, levels = bc_order), 
+                k = i)
+  
+  # Create CrossTable
+  ct <- CrossTable(x = factor(bc_test$cancer_type, levels = bc_order), 
+                   y = factor(bc_knn, levels = bc_order), prop.chisq = F)$t
   
   # Find Accuracy
-  ct <- CrossTable(x = bc_test$cancer_type, y = bc_knn, prop.chisq = F)$t
   accuracy[i] <- findAccuracy(ct)
   
   # Find AUC
-  auc_vals[i] <- auc(as.numeric(factor(bc_test$cancer_type,
-                                       levels = c('Breast Invasive Lobular Carcinoma',
-                                                  'Breast Invasive Ductal Carcinoma'))),
-                     as.numeric(factor(bc_knn)))
+  auc_vals[i] <- auc(as.numeric(bc_test$cancer_type),
+                     as.numeric(factor(bc_knn, levels = bc_order)))
+  
+  # Find Kappa
+  kappa_vals[i] <- Kappa(ct)$Unweighted[[1]]
 }
 
 # Plot accuracy
 data.frame(accuracy) %>%
   ggplot(aes(x = seq(1, max_k), y = accuracy)) +
   geom_line() +
-  labs(x = 'k')
+  labs(x = 'k', title = 'kNN Accuracy') +
+  theme_minimal()
 
 # Plot AUC
 data.frame(auc_vals) %>%
   ggplot(aes(x = seq(1, max_k), y = auc_vals)) +
   geom_line() +
-  labs(x = 'k')
+  labs(x = 'k', title = 'kNN AUC') +
+  theme_minimal()
+
+# Plot Kappa
+data.frame(kappa_vals) %>%
+  ggplot(aes(x = seq(1, max_k), y = kappa_vals)) +
+  geom_line() +
+  labs(x = 'k', title = 'kNN Kappa') +
+  theme_minimal()
 ```
 
-In this section I ran the kNN algorithm 200 times to uncover the model with the
-highest accuracy and AUC.
+In this section I ran the kNN algorithm 100 times to uncover the model with the
+highest accuracy, AUC and Cohen's kappa statistic.
 
-```{r}
-# Final kNN model
-```
 
-```{r}
-# Find the Accuracy
-# accuracy.knn <- findAccuracy(knn.cross$t)
-# paste('The accuracy of this kNN model is:', round(accuracy.knn, 3))
-# kappa.knn <- Kappa(knn.cross$t)
-# paste('The kappa statistic of the kNN model is:', 
-#       round(kappa.knn$Unweighted[[1]], 3))
-```
-
-This model had an overall accuracy of 29.9 with a Cohen's kappa statistic of
-only 0.029. This shows poor performance by the model and reinforces the concern
-that the imbalance in the data set is introducing bias in the model.
 
 
 ## SVM
@@ -483,11 +507,18 @@ for (i in 1:max_its) {
   ann.k[i] <- Kappa(ct$t)
 }
 
+ann.k <- c(unlist(ann.k)[[1]], unlist(ann.k)[[3]], unlist(ann.k)[[5]],
+           unlist(ann.k)[[7]], unlist(ann.k)[[9]], unlist(ann.k)[[11]],
+           unlist(ann.k)[[13]], unlist(ann.k)[[15]], unlist(ann.k)[[17]],
+           unlist(ann.k)[[19]])
+
+# Plot the accuracy
 data.frame(ann.acc) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.acc)) +
   geom_line() +
   labs(title = 'Accuracy of Neural Net Model', x = 'Number of Neurons')
 
+# Plot the kappa
 data.frame(ann.k) %>%
   ggplot(aes(x = seq(1:max_its), y = ann.k)) +
   geom_line() +
