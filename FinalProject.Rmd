@@ -581,7 +581,7 @@ Based on these results, my best neural network model contains 3 nodes. This
 model has an overall accuracy of almost 88%, an AUC value close to 0.65, and a
 kappa statistic of over 0.25. 
 
-```{r evaluate-nn}
+```{r evaluate-nn, include=FALSE}
 # Set seed and random number generator
 RNGversion('3.5.2'); set.seed(123)
 
@@ -611,13 +611,13 @@ runEnsemble <- function(df) {
   ann.en <- predict(bc_ann, df)
   
   # Find the kappa values
-  knn.kappa <- Kappa(CrossTable(knn.en, df$cancer_type, prop.chisq = F)$t)
-  svm.kappa <- Kappa(CrossTable(svm.en, df$cancer_type, prop.chisq = F)$t)
-  ann.kappa <- Kappa(CrossTable(ann.en, df$cancer_type, prop.chisq = F)$t)
+  knn.kappa <- Kappa(CrossTable(knn.en, df$cancer_type, prop.chisq = F)$t)$Unweighted[[1]]
+  svm.kappa <- Kappa(CrossTable(svm.en, df$cancer_type, prop.chisq = F)$t)$Unweighted[[1]]
+  ann.kappa <- Kappa(CrossTable(ann.en, df$cancer_type, prop.chisq = F)$t)$Unweighted[[1]]
   
     # Calculate the weights
   total_kappa <- sum(abs(knn.kappa), svm.kappa, ann.kappa) # knn might not be negative
-  knn.w <- abs(knn.kappa / total_kappa)
+  knn.w <- abs(knn.kappa) / total_kappa
   svm.w <- svm.kappa / total_kappa
   ann.w <- ann.kappa / total_kappa
 
@@ -628,12 +628,12 @@ runEnsemble <- function(df) {
 }
 
 # Function to find the predicted class
-findPrediction <- function(knn_pred, svm_pred, ann_pred) {
+findPrediction <- function(knn_m, svm_m, ann_m, knn.w, svm.w, ann.w) {
 
   # Calculate weighted prediction
-  predictions <- (as.numeric(factor(knn_pred, levels = bc_order)) - 1) * knn.w + 
-    (as.numeric(factor(svm.pred, levels = bc_order)) - 1) * svm.w +
-    (as.numeric(factor(ann.pred, levels = bc_order)) - 1) * ann.w
+  predictions <- (as.numeric(factor(knn_m, levels = bc_order)) - 1) * knn.w + 
+    (as.numeric(factor(svm_m, levels = bc_order)) - 1) * svm.w +
+    (as.numeric(factor(ann_m, levels = bc_order)) - 1) * ann.w
   
   # Update predictions to be binary
   predictions = ifelse(predictions < 0.5, 'Breast Invasive Lobular Carcinoma', 
@@ -643,6 +643,8 @@ findPrediction <- function(knn_pred, svm_pred, ann_pred) {
 
 }
 ```
+
+**HAVING AN ISSUE WHERE THE CLASSES ARE BACKWARD AGAIN**
 
 # Conclusions
 
