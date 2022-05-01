@@ -133,11 +133,11 @@ missing_vals <- lapply(bc, is.na)
 paste('The number of missing values is:', sum(unlist(missing_vals)))
 
 # Add data with  missing values
-m1 <- bc[, cancer_type == 'Breast Invasive Lobular Carcinoma'][1]
+m1 <- bc[bc$cancer_type == 'Breast Invasive Lobular Carcinoma',][1,]
 m1$ATR <- 0
-m2 <- bc[, cancer_type == 'Breast Invasive Lobular Carcinoma'][2]
+m2 <- bc[bc$cancer_type == 'Breast Invasive Lobular Carcinoma',][2,]
 m2$CDH1 <- 0
-m3 <- bc[, cancer_type == 'Breast Invasive Lobular Carcinoma'][3]
+m3 <- bc[bc$cancer_type == 'Breast Invasive Lobular Carcinoma',][3,]
 m3$GATA3 <- 0
 
 # Impute missing values
@@ -383,7 +383,7 @@ findAccuracy <- function(cm) {
 RNGversion('3.5.2'); set.seed(123)
 
 # Initialize variables
-max_k <- 25
+max_k <- 15
 accuracy <- rep(0, max_k)
 auc_vals <- rep(0, max_k)
 kappa_vals <- rep(0, max_k)
@@ -393,7 +393,7 @@ for (i in 1:max_k) {
   # Run the kNN model
   bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
                 test = dplyr::select(bc_test, -cancer_type), 
-                cl = bc_train.oversampled$cancer_type, 
+                cl = as.character(bc_train.oversampled$cancer_type), 
                 k = i)
   
   # Create CrossTable
@@ -436,7 +436,6 @@ data.frame(kappa_vals) %>%
 In this section I ran the kNN algorithm 100 times to uncover the model with the
 highest accuracy, AUC and Cohen's kappa statistic.
 
-
 ## SVM
 
 I decided to use a Support Vector Machine supervised learning algorithm for
@@ -473,8 +472,8 @@ kappa.svm.l <- Kappa(svm.cross$t)
 paste('The Kappa Statistic is:', round(kappa.svm.l$Unweighted[[1]], 4))
 ```
 
-Here we can see the accuracy of our model is 81.7% with a kappa statistic of
-0.21. This is a much better fit of the data than the kNN model.
+Here we can see the accuracy of our model is 80.24% with a kappa statistic of
+0.14. This is a much better fit of the data than the kNN model.
 
 ```{r hypertune-svm}
 # Set seed and random number generator
@@ -513,6 +512,9 @@ provided a better accuracy and kappa statistic than the linear model and the
 polynomial model. Due to improving the runtime I am not including the output of
 the polynomial svm in my final model. 
 
+The accuracy of the radial svm model was 89.67%, the auc was 0.59 and the kappa
+statistic was 0.21.
+
 ## ANN
 
 I decided to use a simple neural network algorithm for this project since it is
@@ -520,7 +522,7 @@ a versatile algorithm. It can be used for classification and numeric, normalized
 features. Tabares-Soto et al. (2020) showed the benefit of this algorithm in
 predicting cancer type from gene expression data. 
 
-```{r neural-net, include=FALSE}
+```{r neural-net, include=FALSE, message=FALSE}
 # Set seed and random number generator
 RNGversion('3.5.2'); set.seed(123)
 
@@ -581,7 +583,7 @@ Based on these results, my best neural network model contains 3 nodes. This
 model has an overall accuracy of almost 88%, an AUC value close to 0.65, and a
 kappa statistic of over 0.25. 
 
-```{r evaluate-nn, include=FALSE}
+```{r evaluate-nn, include=FALSE, message=FALSE}
 # Set seed and random number generator
 RNGversion('3.5.2'); set.seed(123)
 
@@ -606,7 +608,7 @@ runEnsemble <- function(df) {
   # Obtain predictions
   knn.en <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
               test = dplyr::select(df, -cancer_type),
-              cl = bc_train.oversampled$cancer_type, k = 2)
+              cl = as.character(bc_train.oversampled$cancer_type), k = 2)
   svm.en <- predict(bc_svm, df)
   ann.en <- predict(bc_ann, df)
   
@@ -622,7 +624,7 @@ runEnsemble <- function(df) {
   ann.w <- ann.kappa / total_kappa
 
   # Find the predicted class
-  predicted_class <- findPrediction(knn.en, svm.en, ann.en)
+  predicted_class <- findPrediction(knn.en, svm.en, ann.en, knn.w, svm.w, ann.w)
   
   return(predicted_class)
 }
@@ -645,6 +647,23 @@ findPrediction <- function(knn_m, svm_m, ann_m, knn.w, svm.w, ann.w) {
 ```
 
 **HAVING AN ISSUE WHERE THE CLASSES ARE BACKWARD AGAIN**
+**INCLUDE PRECISION AND RECALL FOR ALL MEASURES AND EXPLAIN THAT THE MINORITY**
+**CASE IS GOING TO BE THE "POSITIVE" CASE SINCE THE MAJORITY CASE IS ESSENTIALLY**
+**THE DEFAULT**
+
+```{r}
+final_model <- factor(runEnsemble(bc_valid), levels = bc_order)
+final_ct <- CrossTable(final_model, bc_valid$cancer_type)
+
+# Find the accuracy, kappa, and auc
+final.acc <- findAccuracy(final_ct$t)
+final.k <- Kappa(final_ct$t)$Unweighted[[1]]
+final.auc <- auc(as.numeric(final_model), as.numeric(bc_valid$cancer_type))
+
+paste('The accuracy of the final model is:', round(final.acc, 4))
+paste('The kappa statistic of the final model is:', round(final.k, 4))
+paste('The AUC of the final model is:', round(final.auc, 4))
+```
 
 # Conclusions
 
