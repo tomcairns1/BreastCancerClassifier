@@ -567,7 +567,7 @@ for (i in 1:max_its) {
   
   # Train the model
   ann <- train(cancer_type ~ ., data = bc_train.oversampled, method = 'nnet',
-               tunrGrid = grid)
+               tunrGrid = grid, trControl = control)
   
   # Find the predictions
   pred <- predict(ann, dplyr::select(bc_test, -cancer_type))
@@ -619,7 +619,7 @@ RNGversion('3.5.2'); set.seed(123)
 # Train the model
 grid <- expand.grid(size = 3, decay = 0)
 bc_ann <- train(cancer_type ~ ., data = bc_train.oversampled, 
-                method = 'nnet', tuneGrid = grid)
+                method = 'nnet', tuneGrid = grid, trControl = control)
 ```
 
 This trained neural network model will be used in my final weighted vote
