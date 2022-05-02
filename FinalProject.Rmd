@@ -608,7 +608,7 @@ runEnsemble <- function(df) {
   # Obtain predictions
   knn.en <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
               test = dplyr::select(df, -cancer_type),
-              cl = as.character(bc_train.oversampled$cancer_type), k = 2)
+              cl = as.character(bc_train.oversampled$cancer_type), k = 3)
   svm.en <- predict(bc_svm, df)
   ann.en <- predict(bc_ann, df)
   
