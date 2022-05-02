@@ -510,7 +510,7 @@ RNGversion('3.5.2'); set.seed(123)
 
 # Hypertune the model
 bc_svm <- train(cancer_type ~ ., data = bc_train.oversampled, 
-                method = 'svmRadial')
+                method = 'svmRadial', trControl = control)
 bc_svm.pred <- predict(bc_svm, bc_test)
 
 # bc_svm.hypertune2 <- train(cancer_type ~ ., data = bc_train.oversampled, 
