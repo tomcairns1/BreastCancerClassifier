@@ -641,13 +641,13 @@ runEnsemble <- function(df) {
   svm.en <- predict(bc_svm, df)
   ann.en <- predict(bc_ann, df)
   
-  # Find the kappa values
+  # Find the accuracy values
   knn.acc <- findAccuracy(CrossTable(knn.en, df$cancer_type, prop.chisq = F)$t)
   svm.acc <- findAccuracy(CrossTable(svm.en, df$cancer_type, prop.chisq = F)$t)
   ann.acc<- findAccuracy(CrossTable(ann.en, df$cancer_type, prop.chisq = F)$t)
   
     # Calculate the weights
-  total_acc <- sum(knn.acc, svm.acc, ann.acc) # knn might not be negative
+  total_acc <- sum(knn.acc, svm.acc, ann.acc)
   knn.w <- knn.acc / total_acc
   svm.w <- svm.acc / total_acc
   ann.w <- ann.acc / total_acc
