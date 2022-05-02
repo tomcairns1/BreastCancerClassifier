@@ -474,9 +474,12 @@ similarly to kNN except it tries to maximize the distance between two groups.
 # Set seed and random number generator
 RNGversion('3.5.2'); set.seed(123)
 
+# Create cross validation
+control <- trainControl(method = 'cv', number = 10)
+
 # Create the model
 bc_svm.l <- train(cancer_type ~ ., data = bc_train.oversampled, 
-                method = 'svmLinear3')
+                method = 'svmLinear3', trControl = control)
 
 # Predict test data
 bc_svm.pred_l <- predict(bc_svm.l, bc_test)
