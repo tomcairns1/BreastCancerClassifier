@@ -392,8 +392,8 @@ kappa_vals <- rep(0, max_k)
 for (i in 1:max_k) {
   # Run the kNN model
   bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
-                test = dplyr::select(bc_test, -cancer_type), 
-                cl = as.character(bc_train.oversampled$cancer_type), 
+                test = dplyr::select(bc_test, -cancer_type),
+                cl = as.character(bc_train.oversampled$cancer_type),
                 k = i)
   
   # Create CrossTable
@@ -627,7 +627,7 @@ ensemble below.
 
 ## Ensemble
 
-```{r weighted-vote-ensemble}
+```{r weighted-vote-ensemble, message=FALSE}
 # Set seed and random number generator
 RNGversion('3.5.2'); set.seed(123)
 
@@ -642,15 +642,15 @@ runEnsemble <- function(df) {
   ann.en <- predict(bc_ann, df)
   
   # Find the kappa values
-  knn.kappa <- Kappa(CrossTable(knn.en, df$cancer_type, prop.chisq = F)$t)$Unweighted[[1]]
-  svm.kappa <- Kappa(CrossTable(svm.en, df$cancer_type, prop.chisq = F)$t)$Unweighted[[1]]
-  ann.kappa <- Kappa(CrossTable(ann.en, df$cancer_type, prop.chisq = F)$t)$Unweighted[[1]]
+  knn.acc <- findAccuracy(CrossTable(knn.en, df$cancer_type, prop.chisq = F)$t)
+  svm.acc <- findAccuracy(CrossTable(svm.en, df$cancer_type, prop.chisq = F)$t)
+  ann.acc<- findAccuracy(CrossTable(ann.en, df$cancer_type, prop.chisq = F)$t)
   
     # Calculate the weights
-  total_kappa <- sum(abs(knn.kappa), svm.kappa, ann.kappa) # knn might not be negative
-  knn.w <- abs(knn.kappa) / total_kappa
-  svm.w <- svm.kappa / total_kappa
-  ann.w <- ann.kappa / total_kappa
+  total_acc <- sum(knn.acc, svm.acc, ann.acc) # knn might not be negative
+  knn.w <- knn.acc / total_acc
+  svm.w <- svm.acc / total_acc
+  ann.w <- ann.acc / total_acc
 
   # Find the predicted class
   predicted_class <- findPrediction(knn.en, svm.en, ann.en, knn.w, svm.w, ann.w)
