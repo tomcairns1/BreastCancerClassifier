@@ -433,8 +433,34 @@ data.frame(kappa_vals) %>%
   theme(axis.line = element_line(), panel.background = element_blank())
 ```
 
-In this section I ran the kNN algorithm 100 times to uncover the model with the
+In this section I ran the kNN algorithm 15 times to uncover the model with the
 highest accuracy, AUC and Cohen's kappa statistic.
+
+Based on the figures I created from the model, the best value of k to use is 3.
+This provides an accuracy around 0.7, an AUC of 0.56, and a kappa statistic of
+-0.08. Based on the latter two metrics, this is not the best model to use for
+the data since the test data is so imbalanced. 
+
+```{r final-knn}
+# Train the model
+bc_knn <- knn(train = dplyr::select(bc_train.oversampled, -cancer_type),
+                test = dplyr::select(bc_test, -cancer_type), 
+                cl = as.character(bc_train.oversampled$cancer_type), k = 3)
+
+# Create the cross table
+knn.ct <- CrossTable(x = bc_test$cancer_type, y = bc_knn, prop.chisq = F)
+
+# Calculate the important metrics
+knn.acc <- findAccuracy(knn.ct$t)
+knn.kappa <- Kappa(knn.ct$t)$Unweighted[[1]]
+knn.auc <- auc(as.numeric(factor(bc_knn, levels = bc_order)), 
+               as.numeric(factor(bc_test$cancer_type, levels = bc_order)))
+
+# Print the metrics
+paste('The accuracy of the model is:', round(knn.acc, 4))
+paste('The kappa statistic of the model is:', round(knn.kappa, 4))
+paste('The AUC of the model is:', round(knn.auc, 4))
+```
 
 ## SVM
 
