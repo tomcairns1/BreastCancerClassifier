@@ -646,7 +646,7 @@ runEnsemble <- function(df) {
   svm.acc <- findAccuracy(CrossTable(svm.en, df$cancer_type, prop.chisq = F)$t)
   ann.acc<- findAccuracy(CrossTable(ann.en, df$cancer_type, prop.chisq = F)$t)
   
-    # Calculate the weights
+  # Calculate the weights
   total_acc <- sum(knn.acc, svm.acc, ann.acc)
   knn.w <- knn.acc / total_acc
   svm.w <- svm.acc / total_acc
@@ -675,7 +675,6 @@ findPrediction <- function(knn_m, svm_m, ann_m, knn.w, svm.w, ann.w) {
 }
 ```
 
-**HAVING AN ISSUE WHERE THE CLASSES ARE BACKWARD AGAIN**
 **INCLUDE PRECISION AND RECALL FOR ALL MEASURES AND EXPLAIN THAT THE MINORITY**
 **CASE IS GOING TO BE THE "POSITIVE" CASE SINCE THE MAJORITY CASE IS ESSENTIALLY**
 **THE DEFAULT**
