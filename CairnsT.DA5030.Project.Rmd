@@ -518,6 +518,17 @@ This is unfortunate as I hoped this model would show better performance than
 the kNN model. 
 
 
+## Random Forest
+
+Some of the models I've used in this project are black box models. I would
+really like to know the break down of how different expressions of genes affect
+the cancer diagnosis. In this section I will use a random forest model to classify
+breast cancer type and try to understand the effect of different genes. 
+
+```{r random-forest}
+
+```
+
 
 ## SVM
 
