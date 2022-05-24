@@ -142,31 +142,10 @@ kaggle user pulled other molecular profile Ids, whereas I just pulled from
 # Check missing values
 missing_vals <- lapply(bc, is.na)
 paste('The number of missing values is:', sum(unlist(missing_vals)))
-
-# Add data with  missing values
-m1 <- bc[bc$cancer_type == 'Breast Invasive Lobular Carcinoma',][1,]
-m1$ATR <- 0
-m2 <- bc[bc$cancer_type == 'Breast Invasive Lobular Carcinoma',][2,]
-m2$CDH1 <- 0
-m3 <- bc[bc$cancer_type == 'Breast Invasive Lobular Carcinoma',][3,]
-m3$GATA3 <- 0
-
-# Impute missing values
-bc <- rbind(bc, m1, m2, m3)
-bc <- bc %>%
-  mutate(ATR = ifelse(is.na(ATR), median(ATR), ATR),
-         CDH1 = ifelse(is.na(CDH1), median(CDH1), CDH1),
-         GATA3 = ifelse(is.na(GATA3), median(GATA3), GATA3))
 ```
 
 In this code section I check the dataset for missing values. There are no
 missing values in the entire data set.
-
-I added a few rows with missing values to perform imputation. In this data I
-used rows of the Breast Invasive Lobular Carcinoma class since that was the
-minority class. I imputed the missing values using the median since there
-were some outliers in the data and I wanted to include a method that would be
-less affected by outliers. 
 
 ```{r check_normality}
 # Function to check normality
@@ -474,6 +453,27 @@ knn.auc <- auc(as.numeric(factor(bc_knn, levels = bc_order)),
 paste('The accuracy of the model is:', round(knn.acc, 4))
 paste('The kappa statistic of the model is:', round(knn.kappa, 4))
 paste('The AUC of the model is:', round(knn.auc, 4))
+```
+
+After running this algorithm I am not convinced of the effectiveness of this
+model. I will keep the code and information here to show why I don't think it's
+effective.
+
+
+## Logistic Regression
+
+Since I have two classes and numeric data, I can run a logistic regression on
+the data. I will use AIC to reduce the number of features to find the best model
+fit.
+
+```{r logisitic-regression}
+# Create simple logisitic regression model
+bc_glm <- glm(as.numeric(factor(cancer_type, levels = bc_order)) ~ ., 
+              data = bc_train)
+summary(bc_glm)
+
+# Use stepwise elimination
+bc_glm_step <- step(bc_glm, direction = 'both')
 ```
 
 ## SVM
