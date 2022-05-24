@@ -474,7 +474,50 @@ summary(bc_glm)
 
 # Use stepwise elimination
 bc_glm_step <- step(bc_glm, direction = 'both')
+summary(bc_glm_step)
+
+# Find the number of genes
+paste('The number of genes involved in the model decreased from',
+      length(colnames(bc_train)) - 1, 'to', length(bc_glm_step$coefficients))
 ```
+
+Here I ran a simple logisitic regression model. I then used both a forward
+and backward stepwise algorithm to find a model with the lowest AIC. This 
+reduced the number of genes involved in the model from 168 to 51. Of these 51
+genes, none appear to have a dominant affect on the outcome, which indicates
+that all are involved.
+
+```{r logisitic-regression-evaluation}
+# Evaluate the logisitic regression model
+bc_glm.pred <- predict(bc_glm_step, bc_test)
+
+# Convert the predictions to categorical values
+bc_glm.pred <- ifelse(bc_glm.pred - 1 < 0.5, bc_order[1], bc_order[2])
+
+# Create Cross Table
+glm.cross <- CrossTable(x = bc_test$cancer_type, 
+                        y = factor(bc_glm.pred, level = bc_order))
+
+# Evaluate
+glm.acc <- findAccuracy(glm.cross$t)
+paste('The accuracy of the model is:', round(glm.acc, 4))
+
+glm.auc <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
+               as.numeric(factor(bc_glm.pred, levels = bc_order)))
+paste('The AUC of the model is:', round(glm.auc, 4))
+
+glm.kappa <- Kappa(glm.cross$t)
+paste('The kappa statistic of the model is:', round(glm.kappa$Unweighted[[1]], 4))
+```
+
+This model shows a high accuracy (0.9116), but the AUC and kappa statistic
+indicate that the model is no better than just predicting all classes as 
+the majority case, breast invasive ductal carcinoma.
+
+This is unfortunate as I hoped this model would show better performance than
+the kNN model. 
+
+
 
 ## SVM
 
@@ -509,6 +552,11 @@ svm.cross <- CrossTable(x = bc_test$cancer_type, y = bc_svm.pred_l,
 # Find accuracy
 accuracy.svm.l <- findAccuracy(svm.cross$t)
 paste('The accuracy of the model is:', round(accuracy.svm.l, 4))
+
+# Find AUC
+auc.svm.l <- auc(as.numeric(factor(bc_test$cancer_type, levels = bc_order)),
+               as.numeric(factor(bc_svm.pred_l, levels = bc_order)))
+paste('The AUC of the model is:', round(auc.svm.l, 4))
 
 # Find kappa
 kappa.svm.l <- Kappa(svm.cross$t)
