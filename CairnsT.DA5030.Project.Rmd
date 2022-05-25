@@ -117,11 +117,15 @@ get_samples <- function(study_id, cbio_api) {
 
 # Function to get the molecular data
 get_molecular_data <- function(cbio_api, molecularId, samples) {
-  gene_data <- molecularData(cbio_api, molecularProfileIds = molecularId,
+  if (molecularId != 'NA') {
+    gene_data <- molecularData(cbio_api, molecularProfileIds = molecularId,
                              entrezGeneIds = getGenePanel(cbio_api, 'METABRIC_173')$entrezGeneId,
                              sampleIds = samples)
-  
-  return(gene_data[[1]])
+    
+    return(gene_data[[1]])
+  } else {
+    return('NA')
+  }
 }
 ```
 
