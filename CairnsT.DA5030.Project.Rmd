@@ -115,6 +115,11 @@ get_samples <- function(study_id, cbio_api) {
   return(samples$sampleId)
 }
 
+# Function to get clinical data
+get_clinical_data <- function(study_id, cbio_api) {
+  return(clinicalData(cbio_api, studyId = study_id))
+}
+
 # Function to get the molecular data
 get_molecular_data <- function(cbio_api, molecularId, samples) {
   if (molecularId != 'NA') {
@@ -127,6 +132,20 @@ get_molecular_data <- function(cbio_api, molecularId, samples) {
     return('NA')
   }
 }
+```
+
+In this section I created functions to abstract the process of getting information
+from the API.
+
+```{r}
+# Obtain the molecular Ids
+molecular_ids <- sapply(breast_studyIds, get_molecular_profiles, cbio_api = cbio)
+
+# Obtain the samples
+samples <- sapply(breast_studyIds, get_samples, cbio_api = cbio)
+
+# Obtain the clinical data
+clinical <- sapply(breast_studyIds, get_clinical_data, cbio_api = cbio)
 ```
 
 In my initial plan for this project I downloaded the data from kaggle:https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
