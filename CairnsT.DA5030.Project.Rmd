@@ -96,6 +96,35 @@ breast_cancer_studies <- all_studies[all_studies$cancerTypeId == 'brca' &
 breast_studyIds <- breast_cancer_studies$studyId
 ```
 
+```{r}
+# Function to obtain the molecular profile id
+get_molecular_profiles <- function(study_id, cbio_api) {
+  profile <- molecularProfiles(cbio_api, studyId = study_id, projection = 'SUMMARY')
+  
+  # Find the molecular profile id for mrna microarray expression
+  if ('mRNA expression (microarray)' %in% profile$name) {
+    return(profile[profile$name == 'mRNA expression (microarray)',]$molecularProfileId)
+  } else {
+    return('NA')
+  }
+}
+
+# Function to obtain samples
+get_samples <- function(study_id, cbio_api) {
+  samples <- allSamples(cbio_api, study_id)
+  return(samples$sampleId)
+}
+
+# Function to get the molecular data
+get_molecular_data <- function(cbio_api, molecularId, samples) {
+  gene_data <- molecularData(cbio_api, molecularProfileIds = molecularId,
+                             entrezGeneIds = getGenePanel(cbio_api, 'METABRIC_173')$entrezGeneId,
+                             sampleIds = samples)
+  
+  return(gene_data[[1]])
+}
+```
+
 In my initial plan for this project I downloaded the data from kaggle:https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
 I could not figure out a way to download the data directly from kaggle, but I
 was able to find the original source of the data on https://www.cbioportal.org/study/summary?id=brca_metabric.
