@@ -84,6 +84,18 @@ gene_data <- molecularData(cbio, molecularProfileIds = 'brca_metabric_mrna',
                            sampleIds = all_samples$sampleId)
 ```
 
+```{r}
+# Find all studies
+all_studies <- getStudies(cbio)
+
+# Obtain brca studies
+breast_cancer_studies <- all_studies[all_studies$cancerTypeId == 'brca' & 
+                                       all_studies$allSampleCount > 100,]
+
+# Obtain study Ids
+breast_studyIds <- breast_cancer_studies$studyId
+```
+
 In my initial plan for this project I downloaded the data from kaggle:https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
 I could not figure out a way to download the data directly from kaggle, but I
 was able to find the original source of the data on https://www.cbioportal.org/study/summary?id=brca_metabric.
@@ -218,7 +230,7 @@ each. I will have to impute the missing values in this data set.
 ```{r outlier-control}
 # Function to replace outliers with NA
 removeOutliers <- function(col) {
-  return(ifelse(col > 3, median(col), col))
+  return(ifelse(abs(col) > 3, median(col), col))
 }
 
 # Remove the outliers
