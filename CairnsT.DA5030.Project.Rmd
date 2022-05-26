@@ -141,11 +141,19 @@ from the API.
 # Obtain the molecular Ids
 molecular_ids <- sapply(breast_studyIds, get_molecular_profiles, cbio_api = cbio)
 
+# Clean the molecular Ids
+molecular_ids.df <- data.frame(molecular_ids)
+molecular_ids.df$study_id = row.names(molecular_ids.df)
+molecular_ids.df <- tibble(molecular_ids.df)
+molecular_ids.df <- molecular_ids.df %>% filter(molecular_ids != 'NA')
+
 # Obtain the samples
 samples <- sapply(breast_studyIds, get_samples, cbio_api = cbio)
 
 # Obtain the clinical data
 clinical <- sapply(breast_studyIds, get_clinical_data, cbio_api = cbio)
+
+s_id <- samples[molecular_ids.df$study_id[1]]
 ```
 
 In my initial plan for this project I downloaded the data from kaggle:https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric.
